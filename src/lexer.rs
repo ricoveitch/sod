@@ -5,20 +5,20 @@ pub struct Lexer {
     cursor: usize,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
+    Asterisk,
+    Carat,
+    CloseParenthesis,
+    EOF,
+    Equals,
+    Minus,
+    OpenParenthesis,
+    Plus,
+    Slash,
     Integer(usize),
     Decimal(f64),
     Identifier(String),
-    Plus,
-    Minus,
-    Asterisk,
-    Carat,
-    Slash,
-    OpenParenthesis,
-    CloseParenthesis,
-    Equals,
-    EOF,
 }
 
 impl Lexer {
@@ -68,7 +68,7 @@ impl Lexer {
         }
 
         let num = s.parse()?;
-        return Ok((TokenType::Integer(num), bytes_read));
+        Ok((TokenType::Integer(num), bytes_read))
     }
 
     fn read_word(&self) -> (TokenType, usize) {
