@@ -1,22 +1,9 @@
 use core::panic;
 
-use crate::lexer::{self, TokenType};
-
-#[derive(Debug)]
-pub enum ASTNode {
-    Empty,
-    BinaryExpression {
-        left: Box<ASTNode>,
-        operator: TokenType,
-        right: Box<ASTNode>,
-    },
-    Integer {
-        value: u64,
-    },
-    Decimal {
-        value: f64,
-    },
-}
+use crate::{
+    ast::ast::{ASTNode, BinaryExpression},
+    lexer::{self, TokenType},
+};
 
 pub struct Parser {
     lexer: lexer::Lexer,
@@ -110,10 +97,8 @@ impl Parser {
     fn prefix(&mut self) -> ASTNode {
         let eaten = self.eat_prefix();
         match eaten {
-            TokenType::Decimal(value) => ASTNode::Decimal { value },
-            TokenType::Integer(value) => ASTNode::Integer {
-                value: value as u64,
-            },
+            TokenType::Decimal(value) => ASTNode::Number(value),
+            TokenType::Integer(value) => ASTNode::Number(value as f64),
             _ => panic!("invalid prefix"),
         }
     }
@@ -132,10 +117,10 @@ impl Parser {
             operator_precedence
         };
 
-        return ASTNode::BinaryExpression {
-            left: Box::new(left),
-            operator: operator.clone(),
-            right: Box::new(self.expression(precedence)),
-        };
+        return ASTNode::BinaryExpression(BinaryExpression::new(
+            left,
+            operator.clone(),
+            self.expression(precedence),
+        ));
     }
 }
