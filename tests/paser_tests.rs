@@ -13,9 +13,14 @@ mod tests {
     #[test]
     fn parser() {
         assert_expr("2", 2.0);
+        assert_expr("1+2", 3.0);
+        assert_expr("-2", -2.0);
         assert_expr("1+2*3", 7.0);
         assert_expr("3*2 +1", 7.0);
         assert_expr("2 ^ 3 + 1", 9.0);
         assert_expr("12/2/3", 2.0);
+        assert_expr("(1 + 2) * 3", 9.0);
+        assert_expr("(-2) ^ 2", 4.0);
+        assert_expr("-2 ^ 2", -4.0);
     }
 }

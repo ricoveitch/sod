@@ -25,7 +25,7 @@ impl Parser {
         self.expression(0)
     }
 
-    fn eat_prefix(&mut self) -> TokenType {
+    fn eat_number(&mut self) -> TokenType {
         match self.curr_token {
             TokenType::Decimal(_) | TokenType::Integer(_) => self.eat(&self.curr_token.clone()),
             _ => panic!("unexpected token {:?}, expected a number", self.curr_token),
@@ -70,13 +70,13 @@ impl Parser {
             &TokenType::Slash => 3,
             &TokenType::Plus => 2,
             &TokenType::Minus => 2,
-            _ => panic!("expected an operator by found {:?}", operator),
+            _ => 0,
         }
     }
 
     /**
-     * Expression
-     *    = Prefix (Infix)*
+     * expression
+     *    = prefix (infix)*
      */
     fn expression(&mut self, precedence: usize) -> ASTNode {
         let mut left = self.prefix();
@@ -91,11 +91,19 @@ impl Parser {
     }
 
     /**
-     * Prefix
-     *    = NUMBER
+     * prefix
+     *    = parenthesized_expression
+     *    / UnaryExpression
+     *    / NUMBER
      */
     fn prefix(&mut self) -> ASTNode {
-        let eaten = self.eat_prefix();
+        match &self.curr_token {
+            &TokenType::OpenParenthesis => return self.parenthesized_expression(),
+            &TokenType::Minus => return self.unary_expression(),
+            _ => (),
+        };
+
+        let eaten = self.eat_number();
         match eaten {
             TokenType::Decimal(value) => ASTNode::Number(value),
             TokenType::Integer(value) => ASTNode::Number(value as f64),
@@ -104,8 +112,28 @@ impl Parser {
     }
 
     /**
-     * Infix
-     *    = ("+" / "-" / "*" / "/" / "^") Expression
+     * parenthesized_expression
+     *    = "(" expression ")"
+     */
+    fn parenthesized_expression(&mut self) -> ASTNode {
+        self.eat(&TokenType::OpenParenthesis);
+        let expression = self.expression(0);
+        self.eat(&TokenType::CloseParenthesis);
+        expression
+    }
+
+    /**
+     * unary_expression
+     *    = "-" expression
+     */
+    fn unary_expression(&mut self) -> ASTNode {
+        self.eat(&TokenType::Minus);
+        ASTNode::UnaryExpression(Box::new(self.expression(4)))
+    }
+
+    /**
+     * infix
+     *    = ("+" / "-" / "*" / "/" / "^") expression
      */
     fn infix(&mut self, left: ASTNode, operator: &TokenType) -> ASTNode {
         self.eat_operator();

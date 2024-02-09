@@ -4,6 +4,7 @@ use crate::lexer::TokenType;
 pub enum ASTNode {
     Number(f64),
     BinaryExpression(BinaryExpression),
+    UnaryExpression(Box<ASTNode>),
     Empty,
 }
 
