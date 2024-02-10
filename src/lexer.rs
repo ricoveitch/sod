@@ -71,7 +71,7 @@ impl Lexer {
         Ok((TokenType::Integer(num), bytes_read))
     }
 
-    fn read_word(&self) -> (TokenType, usize) {
+    fn read_identifier(&self) -> (TokenType, usize) {
         let (bytes, bytes_read) = self.read_while(|b| b.is_ascii_alphabetic());
 
         let word = match String::from_utf8(bytes) {
@@ -91,15 +91,15 @@ impl Lexer {
         }
     }
 
-    pub fn next_token(&mut self) -> TokenType {
+    fn next(&mut self) -> (TokenType, usize) {
         self.skip_whitespace();
 
         let byte = match self.peak_byte() {
             Some(b) => b,
-            None => return TokenType::EOF,
+            None => return (TokenType::EOF, 0),
         };
 
-        let (token, bytes_read) = match byte {
+        match byte {
             b'+' => (TokenType::Plus, 1),
             b'-' => (TokenType::Minus, 1),
             b'*' => (TokenType::Asterisk, 1),
@@ -112,12 +112,39 @@ impl Lexer {
                 Ok(r) => r,
                 Err(e) => panic!("{}", e),
             },
-            b if b.is_ascii_alphabetic() => self.read_word(),
+            b if b.is_ascii_alphabetic() => self.read_identifier(),
             _ => panic!("unknown character"),
-        };
-
+        }
+    }
+    pub fn next_token(&mut self) -> TokenType {
+        let (token, bytes_read) = self.next();
         self.cursor += bytes_read;
 
         token
+    }
+
+    pub fn lookahead(&mut self, distance: usize) -> TokenType {
+        let mut i = distance as i32;
+        let mut total_bytes_read: usize = 0;
+
+        loop {
+            let (token, bytes_read) = self.next();
+            self.cursor += bytes_read;
+            total_bytes_read += bytes_read;
+
+            match token {
+                TokenType::EOF => {
+                    self.cursor -= total_bytes_read;
+                    return token;
+                }
+                _ => (),
+            }
+
+            i -= 1;
+            if i < 0 {
+                self.cursor -= total_bytes_read;
+                return token;
+            }
+        }
     }
 }

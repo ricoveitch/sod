@@ -1,8 +1,12 @@
-use orca::{ast::visitor, parser::Parser};
+use orca::{ast::evaluator::ASTVEvaluator, parser::Parser};
 
 fn assert_expr(expr: &str, expected: f64) {
     let mut parser = Parser::new(expr);
-    assert_eq!(expected, visitor::visit(parser.parse()));
+    let program = parser.parse();
+    assert_eq!(
+        expected,
+        ASTVEvaluator::new().eval(program.get(0).unwrap().to_owned())
+    );
 }
 
 #[cfg(test)]

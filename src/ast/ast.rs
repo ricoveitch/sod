@@ -1,18 +1,25 @@
 use crate::lexer::TokenType;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ASTNode {
     Number(f64),
     BinaryExpression(BinaryExpression),
     UnaryExpression(Box<ASTNode>),
-    Empty,
+    VariableExpression(VariableExpression),
+    Variable(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BinaryExpression {
     pub left: Box<ASTNode>,
     pub operator: TokenType,
     pub right: Box<ASTNode>,
+}
+
+#[derive(Debug, Clone)]
+pub struct VariableExpression {
+    pub name: String,
+    pub value: Box<ASTNode>,
 }
 
 impl BinaryExpression {
@@ -24,5 +31,3 @@ impl BinaryExpression {
         }
     }
 }
-
-pub struct Empty {}

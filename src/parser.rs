@@ -1,7 +1,7 @@
 use core::panic;
 
 use crate::{
-    ast::ast::{ASTNode, BinaryExpression},
+    ast::ast::{ASTNode, BinaryExpression, VariableExpression},
     lexer::{self, TokenType},
 };
 
@@ -17,12 +17,12 @@ impl Parser {
         Parser { lexer, curr_token }
     }
 
-    pub fn parse(&mut self) -> ASTNode {
+    pub fn parse(&mut self) -> Vec<ASTNode> {
         if self.curr_token == TokenType::EOF {
-            return ASTNode::Empty;
+            return vec![];
         }
 
-        self.expression(0)
+        self.program()
     }
 
     fn eat_number(&mut self) -> TokenType {
@@ -39,6 +39,20 @@ impl Parser {
             | TokenType::Asterisk
             | TokenType::Slash
             | TokenType::Carat => self.eat(&self.curr_token.clone()),
+            _ => panic!(
+                "unexpected token {:?}, expected an operator",
+                self.curr_token
+            ),
+        }
+    }
+
+    fn eat_identifier(&mut self) -> String {
+        let curr_token = self.curr_token.clone();
+        match &curr_token {
+            TokenType::Identifier(ident) => {
+                self.eat(&curr_token);
+                return ident.clone();
+            }
             _ => panic!(
                 "unexpected token {:?}, expected an operator",
                 self.curr_token
@@ -75,8 +89,55 @@ impl Parser {
     }
 
     /**
+     * Program
+     *    = statement_list
+     */
+    fn program(&mut self) -> Vec<ASTNode> {
+        self.statement_list()
+    }
+
+    /**
+     * statement_list
+     *    = expression+
+     */
+    fn statement_list(&mut self) -> Vec<ASTNode> {
+        let mut statements = vec![];
+        while self.curr_token != lexer::TokenType::EOF {
+            statements.push(self.statement())
+        }
+        return statements;
+    }
+
+    /**
+     * statement
+     *   = variable_expression
+     *   / expression_statement
+     */
+    fn statement(&mut self) -> ASTNode {
+        match self.lexer.lookahead(0) {
+            TokenType::Equals => self.variable_expression(),
+            _ => self.expression(0),
+        }
+    }
+
+    /**
+     * variable_expression
+     *   = identifier "=" expression
+     */
+    fn variable_expression(&mut self) -> ASTNode {
+        let name = self.eat_identifier();
+        self.eat(&TokenType::Equals);
+        let expression = self.expression(0);
+
+        ASTNode::VariableExpression(VariableExpression {
+            name,
+            value: Box::new(expression),
+        })
+    }
+
+    /**
      * expression
-     *    = prefix (infix)*
+     *  = prefix (infix)*
      */
     fn expression(&mut self, precedence: usize) -> ASTNode {
         let mut left = self.prefix();
@@ -93,22 +154,31 @@ impl Parser {
     /**
      * prefix
      *    = parenthesized_expression
-     *    / UnaryExpression
+     *    / unary_expression
      *    / NUMBER
      */
     fn prefix(&mut self) -> ASTNode {
         match &self.curr_token {
             &TokenType::OpenParenthesis => return self.parenthesized_expression(),
             &TokenType::Minus => return self.unary_expression(),
+            &TokenType::Identifier(_) => return self.variable_statement(),
             _ => (),
         };
 
-        let eaten = self.eat_number();
-        match eaten {
+        match self.eat_number() {
             TokenType::Decimal(value) => ASTNode::Number(value),
             TokenType::Integer(value) => ASTNode::Number(value as f64),
             _ => panic!("invalid prefix"),
         }
+    }
+
+    /**
+     * Variable
+     *    = IDENTIFIER
+     */
+    fn variable_statement(&mut self) -> ASTNode {
+        let name = self.eat_identifier();
+        ASTNode::Variable(name)
     }
 
     /**
