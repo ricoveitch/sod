@@ -3,7 +3,7 @@ use orca::parser::Parser;
 use std::io::{self, Write};
 
 fn main() {
-    let mut evaluator = ast::evaluator::ASTVEvaluator::new();
+    let mut evaluator = ast::evaluator::ASTEvaluator::new();
     loop {
         print!("> ");
         std::io::stdout().flush().unwrap();

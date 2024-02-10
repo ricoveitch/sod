@@ -1,11 +1,11 @@
-use orca::{ast::evaluator::ASTVEvaluator, parser::Parser};
+use orca::{ast::evaluator::ASTEvaluator, parser::Parser};
 
 fn assert_expr(expr: &str, expected: f64) {
     let mut parser = Parser::new(expr);
     let program = parser.parse();
     assert_eq!(
         expected,
-        ASTVEvaluator::new().eval(program.get(0).unwrap().to_owned())
+        ASTEvaluator::new().eval(program.get(0).unwrap().to_owned())
     );
 }
 
