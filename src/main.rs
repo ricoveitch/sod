@@ -12,9 +12,11 @@ fn main() {
         io::stdin().read_line(&mut buffer).unwrap();
 
         let program = Parser::new(&buffer).parse();
-        for line in program {
-            println!("ast:{:?}", line);
-            println!("eval:{}", evaluator.eval(line));
+        println!("ast:{:?}", program);
+        for option in evaluator.eval(program) {
+            if let Some(value) = option {
+                println!("{}", value);
+            }
         }
     }
 }

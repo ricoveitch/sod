@@ -27,6 +27,16 @@ mod tests {
                 TokenType::Decimal(1.2),
             ],
         );
+
+        assert_tokens(
+            Lexer::new("1+2\n"),
+            vec![
+                TokenType::Integer(1),
+                TokenType::Plus,
+                TokenType::Integer(2),
+                TokenType::Newline,
+            ],
+        );
     }
 
     #[test]

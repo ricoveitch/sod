@@ -15,7 +15,10 @@ pub enum TokenType {
     Minus,
     OpenParenthesis,
     Plus,
-    Slash,
+    ForwardSlash,
+    OpenBraces,
+    CloseBraces,
+    Newline,
     Integer(usize),
     Decimal(f64),
     Identifier(String),
@@ -82,9 +85,9 @@ impl Lexer {
         return (TokenType::Identifier(word), bytes_read);
     }
 
-    fn skip_whitespace(&mut self) {
+    fn skip_space(&mut self) {
         while let Some(byte) = self.peak_byte() {
-            if !byte.is_ascii_whitespace() {
+            if byte != &b' ' {
                 return;
             }
             self.cursor += 1;
@@ -92,7 +95,7 @@ impl Lexer {
     }
 
     fn next(&mut self) -> (TokenType, usize) {
-        self.skip_whitespace();
+        self.skip_space();
 
         let byte = match self.peak_byte() {
             Some(b) => b,
@@ -104,10 +107,13 @@ impl Lexer {
             b'-' => (TokenType::Minus, 1),
             b'*' => (TokenType::Asterisk, 1),
             b'^' => (TokenType::Carat, 1),
-            b'/' => (TokenType::Slash, 1),
+            b'/' => (TokenType::ForwardSlash, 1),
             b'(' => (TokenType::OpenParenthesis, 1),
             b')' => (TokenType::CloseParenthesis, 1),
             b'=' => (TokenType::Equals, 1),
+            b'{' => (TokenType::OpenBraces, 1),
+            b'}' => (TokenType::CloseBraces, 1),
+            b'\n' => (TokenType::Newline, 1),
             b if b.is_ascii_digit() => match self.read_digit() {
                 Ok(r) => r,
                 Err(e) => panic!("{}", e),
@@ -116,6 +122,7 @@ impl Lexer {
             _ => panic!("unknown character"),
         }
     }
+
     pub fn next_token(&mut self) -> TokenType {
         let (token, bytes_read) = self.next();
         self.cursor += bytes_read;

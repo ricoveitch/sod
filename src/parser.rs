@@ -1,7 +1,7 @@
 use core::panic;
 
 use crate::{
-    ast::ast::{ASTNode, BinaryExpression, VariableExpression},
+    ast::ast::{ASTNode, BinaryExpression, FunctionExpression, VariableExpression},
     lexer::{self, TokenType},
 };
 
@@ -17,11 +17,7 @@ impl Parser {
         Parser { lexer, curr_token }
     }
 
-    pub fn parse(&mut self) -> Vec<ASTNode> {
-        if self.curr_token == TokenType::EOF {
-            return vec![];
-        }
-
+    pub fn parse(&mut self) -> ASTNode {
         self.program()
     }
 
@@ -37,7 +33,7 @@ impl Parser {
             TokenType::Plus
             | TokenType::Minus
             | TokenType::Asterisk
-            | TokenType::Slash
+            | TokenType::ForwardSlash
             | TokenType::Carat => self.eat(&self.curr_token.clone()),
             _ => panic!(
                 "unexpected token {:?}, expected an operator",
@@ -81,7 +77,7 @@ impl Parser {
         match operator {
             &TokenType::Carat => 5,
             &TokenType::Asterisk => 3,
-            &TokenType::Slash => 3,
+            &TokenType::ForwardSlash => 3,
             &TokenType::Plus => 2,
             &TokenType::Minus => 2,
             _ => 0,
@@ -92,32 +88,62 @@ impl Parser {
      * Program
      *    = statement_list
      */
-    fn program(&mut self) -> Vec<ASTNode> {
-        self.statement_list()
+    fn program(&mut self) -> ASTNode {
+        let statement_list = self.statement_list();
+        ASTNode::Program(Box::new(statement_list))
     }
 
     /**
      * statement_list
-     *    = expression+
+     *    = statement+
      */
     fn statement_list(&mut self) -> Vec<ASTNode> {
         let mut statements = vec![];
-        while self.curr_token != lexer::TokenType::EOF {
-            statements.push(self.statement())
+
+        while self.curr_token != TokenType::EOF && self.curr_token != TokenType::CloseBraces {
+            statements.push(self.statement());
+
+            if self.curr_token != TokenType::EOF {
+                self.eat(&TokenType::Newline);
+            }
         }
+
         return statements;
     }
 
     /**
      * statement
      *   = variable_expression
-     *   / expression_statement
+     *   / function_expression
+     *   / expression
      */
     fn statement(&mut self) -> ASTNode {
-        match self.lexer.lookahead(0) {
-            TokenType::Equals => self.variable_expression(),
-            _ => self.expression(0),
+        if self.lexer.lookahead(0) == TokenType::Equals {
+            return self.variable_expression();
         }
+
+        if self.curr_token == TokenType::Identifier("func".to_string()) {
+            return self.function_expression();
+        }
+
+        self.expression(0)
+    }
+
+    /**
+     * expression
+     *  = prefix (infix)*
+     */
+    fn expression(&mut self, precedence: usize) -> ASTNode {
+        let mut left = self.prefix();
+
+        while self.curr_token != TokenType::EOF
+            && self.curr_token != TokenType::Newline
+            && precedence < self.get_precedence(&self.curr_token)
+        {
+            left = self.infix(left, &self.curr_token.clone())
+        }
+
+        left
     }
 
     /**
@@ -136,19 +162,25 @@ impl Parser {
     }
 
     /**
-     * expression
-     *  = prefix (infix)*
+     * function_expression
+     *   = func identifier "(" ")" "{"
+     *         expression
+     *     "}"
      */
-    fn expression(&mut self, precedence: usize) -> ASTNode {
-        let mut left = self.prefix();
+    fn function_expression(&mut self) -> ASTNode {
+        self.eat(&TokenType::Identifier("func".to_string()));
+        let name = self.eat_identifier();
+        self.eat(&TokenType::OpenParenthesis);
+        self.eat(&TokenType::CloseParenthesis);
+        self.eat(&TokenType::OpenBraces);
+        self.eat(&TokenType::Newline);
+        let statement_list = self.statement_list();
+        self.eat(&TokenType::CloseBraces);
 
-        while self.curr_token != TokenType::EOF
-            && precedence < self.get_precedence(&self.curr_token)
-        {
-            left = self.infix(left, &self.curr_token.clone())
-        }
-
-        left
+        ASTNode::FunctionExpression(FunctionExpression {
+            name,
+            body: Box::new(statement_list),
+        })
     }
 
     /**
@@ -170,6 +202,27 @@ impl Parser {
             TokenType::Integer(value) => ASTNode::Number(value as f64),
             _ => panic!("invalid prefix"),
         }
+    }
+
+    /**
+     * infix
+     *    = ("+" / "-" / "*" / "/" / "^") expression
+     */
+    fn infix(&mut self, left: ASTNode, operator: &TokenType) -> ASTNode {
+        self.eat_operator();
+
+        let operator_precedence = self.get_precedence(operator);
+        let precedence = if operator == &TokenType::Carat {
+            operator_precedence - 1
+        } else {
+            operator_precedence
+        };
+
+        ASTNode::BinaryExpression(BinaryExpression {
+            left: Box::new(left),
+            operator: operator.clone(),
+            right: Box::new(self.expression(precedence)),
+        })
     }
 
     /**
@@ -199,26 +252,5 @@ impl Parser {
     fn unary_expression(&mut self) -> ASTNode {
         self.eat(&TokenType::Minus);
         ASTNode::UnaryExpression(Box::new(self.expression(4)))
-    }
-
-    /**
-     * infix
-     *    = ("+" / "-" / "*" / "/" / "^") expression
-     */
-    fn infix(&mut self, left: ASTNode, operator: &TokenType) -> ASTNode {
-        self.eat_operator();
-
-        let operator_precedence = self.get_precedence(operator);
-        let precedence = if operator == &TokenType::Carat {
-            operator_precedence - 1
-        } else {
-            operator_precedence
-        };
-
-        return ASTNode::BinaryExpression(BinaryExpression::new(
-            left,
-            operator.clone(),
-            self.expression(precedence),
-        ));
     }
 }
