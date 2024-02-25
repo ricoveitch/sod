@@ -187,13 +187,22 @@ impl Parser {
      * prefix
      *    = parenthesized_expression
      *    / unary_expression
+     *    / return_expression
      *    / NUMBER
      */
     fn prefix(&mut self) -> ASTNode {
-        match &self.curr_token {
-            &TokenType::OpenParenthesis => return self.parenthesized_expression(),
-            &TokenType::Minus => return self.unary_expression(),
-            &TokenType::Identifier(_) => return self.variable_statement(),
+        match self.curr_token.clone() {
+            TokenType::OpenParenthesis => return self.parenthesized_expression(),
+            TokenType::Minus => return self.unary_expression(),
+            TokenType::Identifier(ident) => {
+                if ident == "return" {
+                    return self.return_expression();
+                }
+                if self.lexer.lookahead(0) == TokenType::OpenParenthesis {
+                    return self.function_call();
+                }
+                return self.variable_statement();
+            }
             _ => (),
         };
 
@@ -243,6 +252,27 @@ impl Parser {
         let expression = self.expression(0);
         self.eat(&TokenType::CloseParenthesis);
         expression
+    }
+
+    /**
+     * return_expression
+     *    = "return" expression
+     */
+    fn return_expression(&mut self) -> ASTNode {
+        self.eat(&TokenType::Identifier("return".to_string()));
+        let expression = self.expression(0);
+        ASTNode::ReturnExpression(Box::new(expression))
+    }
+
+    /**
+     * function_call
+     *    = identifier "(" ")"
+     */
+    fn function_call(&mut self) -> ASTNode {
+        let fname = self.eat_identifier();
+        self.eat(&TokenType::OpenParenthesis);
+        self.eat(&TokenType::CloseParenthesis);
+        ASTNode::FunctionCall(fname)
     }
 
     /**

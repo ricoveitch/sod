@@ -4,9 +4,11 @@ use crate::lexer::TokenType;
 pub enum ASTNode {
     Program(Box<Vec<ASTNode>>),
     FunctionExpression(FunctionExpression),
+    FunctionCall(String),
+    ReturnExpression(Box<ASTNode>),
+    VariableExpression(VariableExpression),
     BinaryExpression(BinaryExpression),
     UnaryExpression(Box<ASTNode>),
-    VariableExpression(VariableExpression),
     Variable(String),
     Number(f64),
 }

@@ -1,4 +1,5 @@
-use orca::{ast::evaluator::ASTEvaluator, parser::Parser};
+use orca::ast::evaluator::{ASTEvaluator, Symbol};
+use orca::parser::Parser;
 
 fn assert_expr(expr: &str, expected: f64) {
     let mut evaluator = ASTEvaluator::new();
@@ -6,7 +7,7 @@ fn assert_expr(expr: &str, expected: f64) {
 
     let program = Parser::new(expr).parse();
     for option in evaluator.eval(program) {
-        if let Some(value) = option {
+        if let Some(Symbol::Number(value)) = option {
             acc += value;
         }
     }
@@ -40,6 +41,6 @@ mod tests {
 
     #[test]
     fn functions() {
-        assert_expr("func foo() {\nx = 1\n}", 0.0)
+        assert_expr("func foo() {\nx = 1\nreturn x\n}\nfoo()", 1.0)
     }
 }
