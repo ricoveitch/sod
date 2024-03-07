@@ -1,24 +1,15 @@
-use std::collections::HashMap;
-
 use super::ast::{ASTNode, BinaryExpression, VariableExpression};
+use super::symbol_table::{Symbol, SymbolTable};
 use crate::lexer::TokenType;
 
-#[derive(Debug, Clone)]
-pub enum Symbol {
-    Number(f64),
-    Function(Box<Vec<ASTNode>>),
-}
-
 pub struct ASTEvaluator {
-    symbol_table: HashMap<String, Symbol>,
-    scope: Vec<String>,
+    symbol_table: SymbolTable,
 }
 
 impl ASTEvaluator {
     pub fn new() -> ASTEvaluator {
         ASTEvaluator {
-            symbol_table: HashMap::new(),
-            scope: vec![],
+            symbol_table: SymbolTable::new(),
         }
     }
 
@@ -35,28 +26,6 @@ impl ASTEvaluator {
         }
     }
 
-    fn get_symbol_key(&self, symbol_name: &str, depth: usize) -> String {
-        let scope_path = self.scope[0..depth].join(".");
-        format!("{}.{}", scope_path, symbol_name)
-    }
-
-    fn get_symbol(&self, name: &str) -> &Symbol {
-        for depth in (0..=self.scope.len()).rev() {
-            let key = self.get_symbol_key(name, depth);
-            match self.symbol_table.get(&key) {
-                Some(symbol) => return symbol,
-                None => (),
-            }
-        }
-
-        panic!("unknown identifier {}", name);
-    }
-
-    fn insert_symbol(&mut self, name: &str, symbol: Symbol) {
-        let key = self.get_symbol_key(name, self.scope.len());
-        self.symbol_table.insert(key, symbol);
-    }
-
     fn eval_node(&mut self, node: ASTNode) -> Option<Symbol> {
         match node {
             ASTNode::Number(value) => Some(Symbol::Number(value)),
@@ -66,9 +35,10 @@ impl ASTEvaluator {
                 self.eval_variable_statement(ve);
                 None
             }
-            ASTNode::Variable(name) => Some(self.get_symbol(&name).clone()),
+            ASTNode::Variable(name) => Some(self.symbol_table.get(&name).clone()),
             ASTNode::FunctionExpression(fe) => {
-                self.insert_symbol(&fe.name, Symbol::Function(fe.body));
+                self.symbol_table
+                    .insert(&fe.name, Symbol::Function(fe.body));
                 None
             }
             ASTNode::FunctionCall(name) => self.eval_function(name),
@@ -77,31 +47,31 @@ impl ASTEvaluator {
     }
 
     fn eval_function(&mut self, name: String) -> Option<Symbol> {
-        let body = match self.get_symbol(&name) {
+        let body = match self.symbol_table.get(&name) {
             Symbol::Function(f) => f.clone(),
             _ => return None,
         };
 
-        self.scope.push(name);
+        self.symbol_table.push_scope(&name);
 
         for line in *body {
             match line {
                 ASTNode::ReturnExpression(expr) => {
                     let res = self.eval_node(*expr);
-                    self.scope.pop();
+                    self.symbol_table.pop_scope();
                     return res;
                 }
                 _ => self.eval_node(line),
             };
         }
 
-        self.scope.pop();
+        self.symbol_table.pop_scope();
         None
     }
 
     fn eval_variable_statement(&mut self, node: VariableExpression) {
         if let Some(val) = self.eval_node(*node.value) {
-            self.insert_symbol(&node.name, val);
+            self.symbol_table.insert(&node.name, val);
         }
     }
 

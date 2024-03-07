@@ -1,4 +1,5 @@
-use orca::ast::evaluator::{ASTEvaluator, Symbol};
+use orca::ast::evaluator::ASTEvaluator;
+use orca::ast::symbol_table::Symbol;
 use orca::parser::Parser;
 
 fn assert_expr(expr: &str, expected: f64) {

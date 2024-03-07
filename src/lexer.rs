@@ -119,7 +119,7 @@ impl Lexer {
                 Err(e) => panic!("{}", e),
             },
             b if b.is_ascii_alphabetic() => self.read_identifier(),
-            _ => panic!("unknown character"),
+            _ => panic!("invalid character: {}", *byte as char),
         }
     }
 
