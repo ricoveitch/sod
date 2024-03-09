@@ -1,5 +1,5 @@
 use orca::ast::evaluator::ASTEvaluator;
-use orca::ast::symbol_table::Symbol;
+use orca::ast::symbol::Symbol;
 use orca::parser::Parser;
 
 fn assert_expr(expr: &str, expected: f64) {
@@ -42,6 +42,10 @@ mod tests {
 
     #[test]
     fn functions() {
-        assert_expr("func foo() {\nx = 1\nreturn x\n}\nfoo()", 1.0)
+        assert_expr("func foo() {\nx = 1\nreturn x\n}\nfoo()", 1.0);
+        assert_expr(
+            "x = 1\nfunc foo(a,b) {\ny = 4\nreturn y + a + b + x\n}\nfoo(x, 100)",
+            106.0,
+        );
     }
 }

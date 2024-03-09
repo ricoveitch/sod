@@ -1,5 +1,6 @@
-use super::ast::{ASTNode, BinaryExpression, VariableExpression};
-use super::symbol_table::{Symbol, SymbolTable};
+use super::ast::{ASTNode, BinaryExpression, FunctionCall, FunctionExpression, VariableExpression};
+use super::symbol::Symbol;
+use super::symbol_table::SymbolTable;
 use crate::lexer::TokenType;
 
 pub struct ASTEvaluator {
@@ -38,23 +39,53 @@ impl ASTEvaluator {
             ASTNode::Variable(name) => Some(self.symbol_table.get(&name).clone()),
             ASTNode::FunctionExpression(fe) => {
                 self.symbol_table
-                    .insert(&fe.name, Symbol::Function(fe.body));
+                    .insert(&fe.name, Symbol::Function(fe.clone()));
                 None
             }
-            ASTNode::FunctionCall(name) => self.eval_function(name),
+            ASTNode::FunctionCall(fc) => self.eval_function_call(fc),
             _ => None,
         }
     }
 
-    fn eval_function(&mut self, name: String) -> Option<Symbol> {
-        let body = match self.symbol_table.get(&name) {
+    fn validate_function_call(&self, func_call: &FunctionCall, func_expr: &FunctionExpression) {
+        if func_call.args.len() < func_expr.args.len() {
+            panic!(
+                "{} missing function args expected {} received {}",
+                func_expr.name,
+                func_expr.args.len(),
+                func_call.args.len()
+            )
+        }
+    }
+
+    fn push_function(&mut self, func_call: &FunctionCall, func_expr: &FunctionExpression) {
+        let mut args = vec![];
+        // evaluate any variables in args
+        for (arg_name, arg_value) in func_expr.args.iter().zip(func_call.args.iter()) {
+            let value = match arg_value {
+                Symbol::Variable(var_name) => self.symbol_table.get(var_name).clone(),
+                _ => arg_value.clone(),
+            };
+            args.push((arg_name, value));
+        }
+
+        self.symbol_table.push_scope(&func_expr.name);
+
+        for (arg_name, arg_value) in args {
+            self.symbol_table.insert(arg_name, arg_value);
+        }
+    }
+
+    fn eval_function_call(&mut self, func_call: FunctionCall) -> Option<Symbol> {
+        let func_expr = match self.symbol_table.get(&func_call.name) {
             Symbol::Function(f) => f.clone(),
             _ => return None,
         };
 
-        self.symbol_table.push_scope(&name);
+        self.validate_function_call(&func_call, &func_expr);
+        self.push_function(&func_call, &func_expr);
 
-        for line in *body {
+        for line in *func_expr.body {
             match line {
                 ASTNode::ReturnExpression(expr) => {
                     let res = self.eval_node(*expr);

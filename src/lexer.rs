@@ -18,6 +18,7 @@ pub enum TokenType {
     ForwardSlash,
     OpenBraces,
     CloseBraces,
+    Comma,
     Newline,
     Integer(usize),
     Decimal(f64),
@@ -113,6 +114,7 @@ impl Lexer {
             b'=' => (TokenType::Equals, 1),
             b'{' => (TokenType::OpenBraces, 1),
             b'}' => (TokenType::CloseBraces, 1),
+            b',' => (TokenType::Comma, 1),
             b'\n' => (TokenType::Newline, 1),
             b if b.is_ascii_digit() => match self.read_digit() {
                 Ok(r) => r,

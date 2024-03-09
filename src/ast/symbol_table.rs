@@ -1,12 +1,6 @@
 use std::collections::HashMap;
 
-use super::ast::ASTNode;
-
-#[derive(Debug, Clone)]
-pub enum Symbol {
-    Number(f64),
-    Function(Box<Vec<ASTNode>>),
-}
+use super::symbol::Symbol;
 
 type Scope = String;
 pub struct SymbolTable {
@@ -31,15 +25,17 @@ impl SymbolTable {
     }
 
     pub fn get(&self, name: &str) -> &Symbol {
-        let scope = self.curr_scope();
-        match self
-            .scoped_table
-            .get(scope)
-            .and_then(|symbol_table| symbol_table.get(name))
-        {
-            Some(v) => v,
-            None => panic!("unknown identifier {}", name),
+        for scope in self.scope.iter().rev() {
+            if let Some(symbol) = self
+                .scoped_table
+                .get(scope)
+                .and_then(|symbol_table| symbol_table.get(name))
+            {
+                return symbol;
+            }
         }
+
+        panic!("unknown symbol {}", name)
     }
 
     pub fn insert(&mut self, name: &str, symbol: Symbol) {

@@ -1,10 +1,12 @@
 use crate::lexer::TokenType;
 
+use super::symbol::Symbol;
+
 #[derive(Debug, Clone)]
 pub enum ASTNode {
     Program(Box<Vec<ASTNode>>),
     FunctionExpression(FunctionExpression),
-    FunctionCall(String),
+    FunctionCall(FunctionCall),
     ReturnExpression(Box<ASTNode>),
     VariableExpression(VariableExpression),
     BinaryExpression(BinaryExpression),
@@ -30,4 +32,11 @@ pub struct VariableExpression {
 pub struct FunctionExpression {
     pub name: String,
     pub body: Box<Vec<ASTNode>>,
+    pub args: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionCall {
+    pub name: String,
+    pub args: Vec<Symbol>, // literal or symbol
 }

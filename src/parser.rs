@@ -1,7 +1,10 @@
 use core::panic;
 
 use crate::{
-    ast::ast::{ASTNode, BinaryExpression, FunctionExpression, VariableExpression},
+    ast::{
+        ast::{ASTNode, BinaryExpression, FunctionCall, FunctionExpression, VariableExpression},
+        symbol::Symbol,
+    },
     lexer::{self, TokenType},
 };
 
@@ -47,10 +50,10 @@ impl Parser {
         match &curr_token {
             TokenType::Identifier(ident) => {
                 self.eat(&curr_token);
-                return ident.clone();
+                ident.clone()
             }
             _ => panic!(
-                "unexpected token {:?}, expected an operator",
+                "unexpected token {:?}, expected an identifier",
                 self.curr_token
             ),
         }
@@ -163,7 +166,7 @@ impl Parser {
 
     /**
      * function_expression
-     *   = func identifier "(" ")" "{"
+     *   = "func" identifier "(" function_expression_args ")" "{"
      *         expression
      *     "}"
      */
@@ -171,6 +174,7 @@ impl Parser {
         self.eat(&TokenType::Identifier("func".to_string()));
         let name = self.eat_identifier();
         self.eat(&TokenType::OpenParenthesis);
+        let func_args = self.function_expression_args();
         self.eat(&TokenType::CloseParenthesis);
         self.eat(&TokenType::OpenBraces);
         self.eat(&TokenType::Newline);
@@ -180,7 +184,29 @@ impl Parser {
         ASTNode::FunctionExpression(FunctionExpression {
             name,
             body: Box::new(statement_list),
+            args: func_args,
         })
+    }
+
+    /**
+     * function_expression_args
+     *   = (identifier,)*
+     */
+    fn function_expression_args(&mut self) -> Vec<String> {
+        if self.curr_token == TokenType::CloseParenthesis {
+            return vec![];
+        }
+
+        let mut args = vec![];
+        loop {
+            args.push(self.eat_identifier());
+            if self.curr_token == TokenType::CloseParenthesis {
+                break;
+            }
+
+            self.eat(&TokenType::Comma);
+        }
+        args
     }
 
     /**
@@ -191,7 +217,7 @@ impl Parser {
      *    / NUMBER
      */
     fn prefix(&mut self) -> ASTNode {
-        match self.curr_token.clone() {
+        match &self.curr_token {
             TokenType::OpenParenthesis => return self.parenthesized_expression(),
             TokenType::Minus => return self.unary_expression(),
             TokenType::Identifier(ident) => {
@@ -266,13 +292,43 @@ impl Parser {
 
     /**
      * function_call
-     *    = identifier "(" ")"
+     *    = identifier "(" function_call_args ")"
      */
     fn function_call(&mut self) -> ASTNode {
         let fname = self.eat_identifier();
         self.eat(&TokenType::OpenParenthesis);
+        let args = self.function_call_args();
         self.eat(&TokenType::CloseParenthesis);
-        ASTNode::FunctionCall(fname)
+        ASTNode::FunctionCall(FunctionCall { name: fname, args })
+    }
+
+    /**
+     * function_call_args
+     *   = ((identifier | NUMBER),)*
+     */
+    fn function_call_args(&mut self) -> Vec<Symbol> {
+        if self.curr_token == TokenType::CloseParenthesis {
+            return vec![];
+        }
+
+        let mut args = vec![];
+        loop {
+            match &self.curr_token {
+                TokenType::Identifier(_) => args.push(Symbol::Variable(self.eat_identifier())),
+                _ => match self.eat_number() {
+                    TokenType::Decimal(value) => args.push(Symbol::Number(value)),
+                    TokenType::Integer(value) => args.push(Symbol::Number(value as f64)),
+                    _ => panic!("invalid function argument"),
+                },
+            };
+            if self.curr_token == TokenType::CloseParenthesis {
+                break;
+            }
+
+            self.eat(&TokenType::Comma);
+        }
+
+        args
     }
 
     /**
