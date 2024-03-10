@@ -2,7 +2,10 @@ use core::panic;
 
 use crate::{
     ast::{
-        ast::{ASTNode, BinaryExpression, FunctionCall, FunctionExpression, VariableExpression},
+        ast::{
+            ASTNode, BinaryExpression, FunctionCall, FunctionExpression, IfStatement,
+            VariableExpression,
+        },
         symbol::Symbol,
     },
     lexer::{self, TokenType},
@@ -24,6 +27,13 @@ impl Parser {
         self.program()
     }
 
+    fn lookahead(&mut self, distance: usize) -> TokenType {
+        match distance {
+            0 => self.curr_token.clone(),
+            _ => self.lexer.lookahead(distance),
+        }
+    }
+
     fn eat_number(&mut self) -> TokenType {
         match self.curr_token {
             TokenType::Decimal(_) | TokenType::Integer(_) => self.eat(&self.curr_token.clone()),
@@ -37,7 +47,11 @@ impl Parser {
             | TokenType::Minus
             | TokenType::Asterisk
             | TokenType::ForwardSlash
-            | TokenType::Carat => self.eat(&self.curr_token.clone()),
+            | TokenType::Carat
+            | TokenType::GreaterThan
+            | TokenType::LessThan
+            | TokenType::GreaterThanOrEqualTo
+            | TokenType::LessThanOrEqualTo => self.eat(&self.curr_token.clone()),
             _ => panic!(
                 "unexpected token {:?}, expected an operator",
                 self.curr_token
@@ -73,7 +87,7 @@ impl Parser {
 
         let previous_token = self.curr_token.clone();
         self.curr_token = self.lexer.next_token();
-        return previous_token;
+        previous_token
     }
 
     fn get_precedence(&self, operator: &TokenType) -> usize {
@@ -83,6 +97,11 @@ impl Parser {
             &TokenType::ForwardSlash => 3,
             &TokenType::Plus => 2,
             &TokenType::Minus => 2,
+            &TokenType::DoubleEquals => 1,
+            &TokenType::GreaterThan => 1,
+            &TokenType::LessThan => 1,
+            &TokenType::GreaterThanOrEqualTo => 1,
+            &TokenType::LessThanOrEqualTo => 1,
             _ => 0,
         }
     }
@@ -111,25 +130,51 @@ impl Parser {
             }
         }
 
-        return statements;
+        statements
     }
 
     /**
      * statement
      *   = variable_expression
      *   / function_expression
+     *   / if_statement
      *   / expression
      */
     fn statement(&mut self) -> ASTNode {
-        if self.lexer.lookahead(0) == TokenType::Equals {
+        if self.lookahead(1) == TokenType::Equals {
             return self.variable_expression();
         }
 
-        if self.curr_token == TokenType::Identifier("func".to_string()) {
-            return self.function_expression();
-        }
+        if let TokenType::Identifier(ident) = &self.curr_token {
+            match ident.as_str() {
+                "func" => return self.function_expression(),
+                "if" => return self.if_statement(),
+                _ => (),
+            };
+        };
 
         self.expression(0)
+    }
+
+    /**
+     * if_statement
+     *   = "if" expression "{"
+     *         statement_list
+     *     "}"
+     */
+    fn if_statement(&mut self) -> ASTNode {
+        self.eat(&TokenType::Identifier("if".to_string()));
+        let condition = self.expression(0);
+        self.eat(&TokenType::OpenBraces);
+        self.eat(&TokenType::Newline);
+        let consequence = self.statement_list();
+        self.eat(&TokenType::CloseBraces);
+
+        ASTNode::IfStatement(IfStatement {
+            condition: Box::new(condition),
+            consequence: Box::new(consequence),
+            alternative: None,
+        })
     }
 
     /**
@@ -167,7 +212,7 @@ impl Parser {
     /**
      * function_expression
      *   = "func" identifier "(" function_expression_args ")" "{"
-     *         expression
+     *         statement_list
      *     "}"
      */
     fn function_expression(&mut self) -> ASTNode {
@@ -224,7 +269,7 @@ impl Parser {
                 if ident == "return" {
                     return self.return_expression();
                 }
-                if self.lexer.lookahead(0) == TokenType::OpenParenthesis {
+                if self.lookahead(1) == TokenType::OpenParenthesis {
                     return self.function_call();
                 }
                 return self.variable_statement();
@@ -241,7 +286,7 @@ impl Parser {
 
     /**
      * infix
-     *    = ("+" / "-" / "*" / "/" / "^") expression
+     *    = ("+" / "-" / "*" / "/" / "^" / "==" / ">" / "<" / ">=" / "<=") expression
      */
     fn infix(&mut self, left: ASTNode, operator: &TokenType) -> ASTNode {
         self.eat_operator();

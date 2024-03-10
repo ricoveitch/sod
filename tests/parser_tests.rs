@@ -48,4 +48,9 @@ mod tests {
             106.0,
         );
     }
+
+    #[test]
+    fn conditionals() {
+        assert_expr("x = 10\nif 2 > 1 {\n x = 20\n}\nx", 20.0);
+    }
 }

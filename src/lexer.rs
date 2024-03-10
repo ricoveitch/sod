@@ -9,17 +9,22 @@ pub struct Lexer {
 pub enum TokenType {
     Asterisk,
     Carat,
+    CloseBraces,
     CloseParenthesis,
+    Comma,
+    DoubleEquals,
     EOF,
     Equals,
+    ForwardSlash,
+    GreaterThan,
+    GreaterThanOrEqualTo,
+    LessThan,
+    LessThanOrEqualTo,
     Minus,
+    Newline,
+    OpenBraces,
     OpenParenthesis,
     Plus,
-    ForwardSlash,
-    OpenBraces,
-    CloseBraces,
-    Comma,
-    Newline,
     Integer(usize),
     Decimal(f64),
     Identifier(String),
@@ -33,8 +38,8 @@ impl Lexer {
         }
     }
 
-    fn peak_byte(&self) -> Option<&u8> {
-        self.src.get(self.cursor)
+    fn peak_byte(&self, distance: usize) -> Option<&u8> {
+        self.src.get(self.cursor + distance)
     }
 
     fn read_while(&self, mut pred: impl FnMut(&u8) -> bool) -> (Vec<u8>, usize) {
@@ -61,7 +66,7 @@ impl Lexer {
                 return true;
             }
 
-            return b.is_ascii_digit();
+            b.is_ascii_digit()
         });
 
         let s = String::from_utf8(bytes)?;
@@ -83,11 +88,40 @@ impl Lexer {
             Err(_) => panic!("invalid word"),
         };
 
-        return (TokenType::Identifier(word), bytes_read);
+        (TokenType::Identifier(word), bytes_read)
+    }
+
+    fn read_equals(&self) -> (TokenType, usize) {
+        match self.peak_byte(1) {
+            Some(b) if b == &b'=' => (TokenType::DoubleEquals, 2),
+            _ => (TokenType::Equals, 1),
+        }
+    }
+
+    fn read_comparison(&self) -> (TokenType, usize) {
+        let start = self.peak_byte(0).unwrap();
+
+        match self.peak_byte(1) {
+            Some(b) if b == &b'=' => (),
+            _ => {
+                let tok = match start {
+                    b'>' => TokenType::GreaterThan,
+                    b'<' => TokenType::LessThan,
+                    _ => panic!("invalid character {}", *start as char),
+                };
+                return (tok, 1);
+            }
+        };
+
+        match start {
+            b'>' => (TokenType::GreaterThanOrEqualTo, 2),
+            b'<' => (TokenType::LessThanOrEqualTo, 2),
+            _ => panic!("invalid character {}", *start as char),
+        }
     }
 
     fn skip_space(&mut self) {
-        while let Some(byte) = self.peak_byte() {
+        while let Some(byte) = self.peak_byte(0) {
             if byte != &b' ' {
                 return;
             }
@@ -98,7 +132,7 @@ impl Lexer {
     fn next(&mut self) -> (TokenType, usize) {
         self.skip_space();
 
-        let byte = match self.peak_byte() {
+        let byte = match self.peak_byte(0) {
             Some(b) => b,
             None => return (TokenType::EOF, 0),
         };
@@ -111,11 +145,12 @@ impl Lexer {
             b'/' => (TokenType::ForwardSlash, 1),
             b'(' => (TokenType::OpenParenthesis, 1),
             b')' => (TokenType::CloseParenthesis, 1),
-            b'=' => (TokenType::Equals, 1),
             b'{' => (TokenType::OpenBraces, 1),
             b'}' => (TokenType::CloseBraces, 1),
             b',' => (TokenType::Comma, 1),
             b'\n' => (TokenType::Newline, 1),
+            b'=' => self.read_equals(),
+            b'>' | b'<' => self.read_comparison(),
             b if b.is_ascii_digit() => match self.read_digit() {
                 Ok(r) => r,
                 Err(e) => panic!("{}", e),
@@ -147,10 +182,10 @@ impl Lexer {
                     return token;
                 }
                 _ => (),
-            }
+            };
 
             i -= 1;
-            if i < 0 {
+            if i <= 0 {
                 self.cursor -= total_bytes_read;
                 return token;
             }

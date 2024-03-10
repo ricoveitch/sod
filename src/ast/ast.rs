@@ -5,6 +5,7 @@ use super::symbol::Symbol;
 #[derive(Debug, Clone)]
 pub enum ASTNode {
     Program(Box<Vec<ASTNode>>),
+    IfStatement(IfStatement),
     FunctionExpression(FunctionExpression),
     FunctionCall(FunctionCall),
     ReturnExpression(Box<ASTNode>),
@@ -38,5 +39,12 @@ pub struct FunctionExpression {
 #[derive(Debug, Clone)]
 pub struct FunctionCall {
     pub name: String,
-    pub args: Vec<Symbol>, // literal or symbol
+    pub args: Vec<Symbol>,
+}
+
+#[derive(Debug, Clone)]
+pub struct IfStatement {
+    pub condition: Box<ASTNode>,
+    pub consequence: Box<Vec<ASTNode>>,
+    pub alternative: Option<Box<ASTNode>>,
 }
