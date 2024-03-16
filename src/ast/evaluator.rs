@@ -3,6 +3,8 @@ use super::ast::{
 };
 use super::symbol::Symbol;
 use super::symbol_table::SymbolTable;
+use super::util;
+use crate::ast::symbol_table::ScopeKind;
 use crate::lexer::TokenType;
 
 pub struct ASTEvaluator {
@@ -37,14 +39,13 @@ impl ASTEvaluator {
 
     fn eval_node(&mut self, node: ASTNode) -> Option<Symbol> {
         match node {
-            ASTNode::Number(value) => Some(Symbol::Number(value)),
             ASTNode::BinaryExpression(be) => self.eval_binary_expression(be),
             ASTNode::UnaryExpression(n) => self.eval_unary_expression(*n),
             ASTNode::VariableExpression(ve) => {
-                self.eval_variable_statement(ve);
+                self.eval_variable_expression(ve);
                 None
             }
-            ASTNode::Variable(name) => Some(self.symbol_table.get(&name).clone()),
+            ASTNode::Variable(name) => Some(self.get_symbol(&name)),
             ASTNode::FunctionExpression(fe) => {
                 self.symbol_table
                     .insert(&fe.name, Symbol::Function(fe.clone()));
@@ -55,7 +56,19 @@ impl ASTEvaluator {
                 self.eval_if_statement(is);
                 None
             }
+            ASTNode::Number(value) => Some(Symbol::Number(value)),
+            ASTNode::Boolean(value) => Some(Symbol::Boolean(value)),
             _ => None,
+        }
+    }
+
+    fn get_symbol(&self, name: &str) -> Symbol {
+        match self.symbol_table.get(&name) {
+            Some(symbol) => symbol.clone(),
+            None => {
+                println!("{:?}", self.symbol_table.scoped_table);
+                panic!("undeclared variable '{}'", name);
+            }
         }
     }
 
@@ -69,8 +82,9 @@ impl ASTEvaluator {
             None => false,
         };
 
+        println!("passed={}", passed);
         if passed {
-            self.symbol_table.push_scope("if");
+            self.symbol_table.push_scope(ScopeKind::Conditional);
             self.eval_statement_list(*if_statement.consequence);
             self.symbol_table.pop_scope();
         }
@@ -92,13 +106,13 @@ impl ASTEvaluator {
         // evaluate any variables in args
         for (arg_name, arg_value) in func_expr.args.iter().zip(func_call.args.iter()) {
             let value = match arg_value {
-                Symbol::Variable(var_name) => self.symbol_table.get(var_name).clone(),
+                Symbol::Variable(var_name) => self.get_symbol(&var_name),
                 _ => arg_value.clone(),
             };
             args.push((arg_name, value));
         }
 
-        self.symbol_table.push_scope(&func_expr.name);
+        self.symbol_table.push_scope(ScopeKind::Function);
 
         for (arg_name, arg_value) in args {
             self.symbol_table.insert(arg_name, arg_value);
@@ -106,7 +120,7 @@ impl ASTEvaluator {
     }
 
     fn eval_function_call(&mut self, func_call: FunctionCall) -> Option<Symbol> {
-        let func_expr = match self.symbol_table.get(&func_call.name) {
+        let func_expr = match self.get_symbol(&func_call.name) {
             Symbol::Function(f) => f.clone(),
             _ => return None,
         };
@@ -129,7 +143,7 @@ impl ASTEvaluator {
         None
     }
 
-    fn eval_variable_statement(&mut self, node: VariableExpression) {
+    fn eval_variable_expression(&mut self, node: VariableExpression) {
         if let Some(val) = self.eval_node(*node.value) {
             self.symbol_table.insert(&node.name, val);
         }
@@ -158,13 +172,9 @@ impl ASTEvaluator {
             None => return None,
         };
 
-        let result_symbol = match be.operator {
-            TokenType::DoubleEquals
-            | TokenType::GreaterThan
-            | TokenType::LessThan
-            | TokenType::GreaterThanOrEqualTo
-            | TokenType::LessThanOrEqualTo => {
-                self.compare(&left_symbol, &be.operator, &right_symbol)
+        let result_symbol = match &be.operator {
+            op if util::is_comparative_operator(op) => {
+                self.compare(&left_symbol, op, &right_symbol)
             }
             _ => self.eval_math_expression(&left_symbol, &be.operator, &right_symbol),
         };
@@ -196,15 +206,23 @@ impl ASTEvaluator {
     fn compare(&self, left: &Symbol, operator: &TokenType, right: &Symbol) -> Symbol {
         match (left, right) {
             (Symbol::Number(ln), Symbol::Number(rn)) => self.compare_number(*ln, operator, *rn),
-            (Symbol::Boolean(lb), Symbol::Boolean(rb)) => match operator {
-                TokenType::DoubleEquals => Symbol::Boolean(lb == rb),
-                _ => panic!(
-                    "{:?} {:?} {:?}: unable to compare booleans",
-                    left, operator, right
-                ),
-            },
+            (Symbol::Boolean(lb), Symbol::Boolean(rb)) => self.compare_bool(*lb, operator, *rb),
             _ => panic!("{:?} {:?} {:?}: type mismatch", left, operator, right),
         }
+    }
+
+    fn compare_bool(&self, left: bool, operator: &TokenType, right: bool) -> Symbol {
+        let bool_result = match operator {
+            TokenType::DoubleEquals => left == right,
+            TokenType::And => left && right,
+            TokenType::Or => left || right,
+            _ => panic!(
+                "{:?} {:?} {:?}: unable to compare booleans",
+                left, operator, right
+            ),
+        };
+
+        Symbol::Boolean(bool_result)
     }
 
     fn compare_number(&self, left: f64, operator: &TokenType, right: f64) -> Symbol {

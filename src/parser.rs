@@ -51,7 +51,9 @@ impl Parser {
             | TokenType::GreaterThan
             | TokenType::LessThan
             | TokenType::GreaterThanOrEqualTo
-            | TokenType::LessThanOrEqualTo => self.eat(&self.curr_token.clone()),
+            | TokenType::LessThanOrEqualTo
+            | TokenType::And
+            | TokenType::Or => self.eat(&self.curr_token.clone()),
             _ => panic!(
                 "unexpected token {:?}, expected an operator",
                 self.curr_token
@@ -102,6 +104,8 @@ impl Parser {
             &TokenType::LessThan => 1,
             &TokenType::GreaterThanOrEqualTo => 1,
             &TokenType::LessThanOrEqualTo => 1,
+            &TokenType::And => 1,
+            &TokenType::Or => 1,
             _ => 0,
         }
     }
@@ -265,15 +269,7 @@ impl Parser {
         match &self.curr_token {
             TokenType::OpenParenthesis => return self.parenthesized_expression(),
             TokenType::Minus => return self.unary_expression(),
-            TokenType::Identifier(ident) => {
-                if ident == "return" {
-                    return self.return_expression();
-                }
-                if self.lookahead(1) == TokenType::OpenParenthesis {
-                    return self.function_call();
-                }
-                return self.variable_statement();
-            }
+            TokenType::Identifier(_) => return self.identifier(),
             _ => (),
         };
 
@@ -284,9 +280,23 @@ impl Parser {
         }
     }
 
+    fn identifier(&mut self) -> ASTNode {
+        let ident = self.eat_identifier();
+        if self.curr_token == TokenType::OpenParenthesis {
+            return self.function_call(ident);
+        }
+
+        match ident.as_str() {
+            "return" => self.return_expression(),
+            "true" => ASTNode::Boolean(true),
+            "false" => ASTNode::Boolean(false),
+            _ => ASTNode::Variable(ident),
+        }
+    }
+
     /**
      * infix
-     *    = ("+" / "-" / "*" / "/" / "^" / "==" / ">" / "<" / ">=" / "<=") expression
+     *    = ("+" / "-" / "*" / "/" / "^" / "==" / ">" / "<" / ">=" / "<=" / "&&" / "||") expression
      */
     fn infix(&mut self, left: ASTNode, operator: &TokenType) -> ASTNode {
         self.eat_operator();
@@ -306,15 +316,6 @@ impl Parser {
     }
 
     /**
-     * Variable
-     *    = IDENTIFIER
-     */
-    fn variable_statement(&mut self) -> ASTNode {
-        let name = self.eat_identifier();
-        ASTNode::Variable(name)
-    }
-
-    /**
      * parenthesized_expression
      *    = "(" expression ")"
      */
@@ -330,7 +331,6 @@ impl Parser {
      *    = "return" expression
      */
     fn return_expression(&mut self) -> ASTNode {
-        self.eat(&TokenType::Identifier("return".to_string()));
         let expression = self.expression(0);
         ASTNode::ReturnExpression(Box::new(expression))
     }
@@ -339,8 +339,7 @@ impl Parser {
      * function_call
      *    = identifier "(" function_call_args ")"
      */
-    fn function_call(&mut self) -> ASTNode {
-        let fname = self.eat_identifier();
+    fn function_call(&mut self, fname: String) -> ASTNode {
         self.eat(&TokenType::OpenParenthesis);
         let args = self.function_call_args();
         self.eat(&TokenType::CloseParenthesis);

@@ -5,15 +5,20 @@ use super::symbol::Symbol;
 #[derive(Debug, Clone)]
 pub enum ASTNode {
     Program(Box<Vec<ASTNode>>),
-    IfStatement(IfStatement),
+
     FunctionExpression(FunctionExpression),
     FunctionCall(FunctionCall),
+
     ReturnExpression(Box<ASTNode>),
     VariableExpression(VariableExpression),
     BinaryExpression(BinaryExpression),
     UnaryExpression(Box<ASTNode>),
+
+    IfStatement(IfStatement),
+
     Variable(String),
     Number(f64),
+    Boolean(bool),
 }
 
 #[derive(Debug, Clone)]

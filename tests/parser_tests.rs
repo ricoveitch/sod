@@ -52,5 +52,9 @@ mod tests {
     #[test]
     fn conditionals() {
         assert_expr("x = 10\nif 2 > 1 {\n x = 20\n}\nx", 20.0);
+        assert_expr(
+            "foo=1\nx = true\ny = false\nif x || y {\n foo = 2\n}\nfoo",
+            2.0,
+        );
     }
 }

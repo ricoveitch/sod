@@ -8,6 +8,7 @@ pub struct Lexer {
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     Asterisk,
+    And,
     Carat,
     CloseBraces,
     CloseParenthesis,
@@ -15,6 +16,7 @@ pub enum TokenType {
     DoubleEquals,
     EOF,
     Equals,
+    Or,
     ForwardSlash,
     GreaterThan,
     GreaterThanOrEqualTo,
@@ -40,6 +42,13 @@ impl Lexer {
 
     fn peak_byte(&self, distance: usize) -> Option<&u8> {
         self.src.get(self.cursor + distance)
+    }
+
+    fn peaked_byte_is(&self, target: &u8, distance: usize) -> bool {
+        match self.peak_byte(distance) {
+            Some(b) => b == target,
+            None => false,
+        }
     }
 
     fn read_while(&self, mut pred: impl FnMut(&u8) -> bool) -> (Vec<u8>, usize) {
@@ -120,6 +129,22 @@ impl Lexer {
         }
     }
 
+    fn read_and(&self) -> (TokenType, usize) {
+        if !self.peaked_byte_is(&b'&', 1) {
+            panic!("expected &&");
+        }
+
+        (TokenType::And, 2)
+    }
+
+    fn read_or(&self) -> (TokenType, usize) {
+        if !self.peaked_byte_is(&b'|', 1) {
+            panic!("expected ||");
+        }
+
+        (TokenType::Or, 2)
+    }
+
     fn skip_space(&mut self) {
         while let Some(byte) = self.peak_byte(0) {
             if byte != &b' ' {
@@ -149,6 +174,8 @@ impl Lexer {
             b'}' => (TokenType::CloseBraces, 1),
             b',' => (TokenType::Comma, 1),
             b'\n' => (TokenType::Newline, 1),
+            b'|' => self.read_or(),
+            b'&' => self.read_and(),
             b'=' => self.read_equals(),
             b'>' | b'<' => self.read_comparison(),
             b if b.is_ascii_digit() => match self.read_digit() {
