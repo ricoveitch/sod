@@ -56,6 +56,10 @@ impl ASTEvaluator {
                 self.eval_if_statement(is);
                 None
             }
+            ASTNode::BlockStatement(bs) => {
+                self.eval_statement_list(*bs.body);
+                return None;
+            }
             ASTNode::Number(value) => Some(Symbol::Number(value)),
             ASTNode::Boolean(value) => Some(Symbol::Boolean(value)),
             _ => None,
@@ -82,10 +86,13 @@ impl ASTEvaluator {
             None => false,
         };
 
-        println!("passed={}", passed);
         if passed {
-            self.symbol_table.push_scope(ScopeKind::Conditional);
-            self.eval_statement_list(*if_statement.consequence);
+            self.symbol_table.push_scope(ScopeKind::ConditionalBlock);
+            self.eval_node(*if_statement.consequence);
+            self.symbol_table.pop_scope();
+        } else if let Some(alternative) = if_statement.alternative {
+            self.symbol_table.push_scope(ScopeKind::ConditionalBlock);
+            self.eval_node(*alternative);
             self.symbol_table.pop_scope();
         }
     }
@@ -112,7 +119,7 @@ impl ASTEvaluator {
             args.push((arg_name, value));
         }
 
-        self.symbol_table.push_scope(ScopeKind::Function);
+        self.symbol_table.push_scope(ScopeKind::FunctionBlock);
 
         for (arg_name, arg_value) in args {
             self.symbol_table.insert(arg_name, arg_value);
@@ -214,6 +221,7 @@ impl ASTEvaluator {
     fn compare_bool(&self, left: bool, operator: &TokenType, right: bool) -> Symbol {
         let bool_result = match operator {
             TokenType::DoubleEquals => left == right,
+            TokenType::NotEquals => left != right,
             TokenType::And => left && right,
             TokenType::Or => left || right,
             _ => panic!(
@@ -228,6 +236,7 @@ impl ASTEvaluator {
     fn compare_number(&self, left: f64, operator: &TokenType, right: f64) -> Symbol {
         let res = match operator {
             TokenType::DoubleEquals => left == right,
+            TokenType::NotEquals => left != right,
             TokenType::GreaterThan => left > right,
             TokenType::LessThan => left < right,
             TokenType::GreaterThanOrEqualTo => left >= right,

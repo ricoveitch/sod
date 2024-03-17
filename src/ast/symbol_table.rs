@@ -5,8 +5,8 @@ use super::symbol::Symbol;
 #[derive(PartialEq)]
 pub enum ScopeKind {
     Global,
-    Function,
-    Conditional,
+    FunctionBlock,
+    ConditionalBlock,
 }
 
 struct Scope {
@@ -64,8 +64,8 @@ impl ScopeStack {
 
     pub fn push(&mut self, kind: ScopeKind) {
         match kind {
-            ScopeKind::Conditional => self.push_scope(kind),
-            ScopeKind::Function => self.push_scope_stack(kind),
+            ScopeKind::ConditionalBlock => self.push_scope(kind),
+            ScopeKind::FunctionBlock => self.push_scope_stack(kind),
             ScopeKind::Global => panic!("not able to push another global scope"),
         };
     }

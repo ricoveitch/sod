@@ -5,6 +5,7 @@ pub fn is_comparative_operator(operator: &TokenType) -> bool {
         TokenType::And
         | TokenType::Or
         | TokenType::DoubleEquals
+        | TokenType::NotEquals
         | TokenType::GreaterThan
         | TokenType::LessThan
         | TokenType::GreaterThanOrEqualTo

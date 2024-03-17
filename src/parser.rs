@@ -3,8 +3,8 @@ use core::panic;
 use crate::{
     ast::{
         ast::{
-            ASTNode, BinaryExpression, FunctionCall, FunctionExpression, IfStatement,
-            VariableExpression,
+            ASTNode, BinaryExpression, BlockStatement, FunctionCall, FunctionExpression,
+            IfStatement, VariableExpression,
         },
         symbol::Symbol,
     },
@@ -52,6 +52,8 @@ impl Parser {
             | TokenType::LessThan
             | TokenType::GreaterThanOrEqualTo
             | TokenType::LessThanOrEqualTo
+            | TokenType::DoubleEquals
+            | TokenType::NotEquals
             | TokenType::And
             | TokenType::Or => self.eat(&self.curr_token.clone()),
             _ => panic!(
@@ -100,6 +102,7 @@ impl Parser {
             &TokenType::Plus => 2,
             &TokenType::Minus => 2,
             &TokenType::DoubleEquals => 1,
+            &TokenType::NotEquals => 1,
             &TokenType::GreaterThan => 1,
             &TokenType::LessThan => 1,
             &TokenType::GreaterThanOrEqualTo => 1,
@@ -127,6 +130,11 @@ impl Parser {
         let mut statements = vec![];
 
         while self.curr_token != TokenType::EOF && self.curr_token != TokenType::CloseBraces {
+            if self.curr_token == TokenType::Newline {
+                self.eat(&TokenType::Newline);
+                continue;
+            }
+
             statements.push(self.statement());
 
             if self.curr_token != TokenType::EOF {
@@ -162,22 +170,55 @@ impl Parser {
 
     /**
      * if_statement
-     *   = "if" expression "{"
-     *         statement_list
-     *     "}"
+     *   = "if" block_statement else_statement?
      */
     fn if_statement(&mut self) -> ASTNode {
         self.eat(&TokenType::Identifier("if".to_string()));
         let condition = self.expression(0);
-        self.eat(&TokenType::OpenBraces);
-        self.eat(&TokenType::Newline);
-        let consequence = self.statement_list();
-        self.eat(&TokenType::CloseBraces);
+        let consequence = self.block_statement();
+        let alternative = match self.else_statement() {
+            Some(node) => Some(Box::new(node)),
+            None => None,
+        };
 
         ASTNode::IfStatement(IfStatement {
             condition: Box::new(condition),
             consequence: Box::new(consequence),
-            alternative: None,
+            alternative,
+        })
+    }
+
+    /**
+     * else_statement
+     *   = "else" (if_statement|block_statement)
+     */
+    fn else_statement(&mut self) -> Option<ASTNode> {
+        if self.curr_token != TokenType::Identifier("else".to_string()) {
+            return None;
+        }
+        self.eat_identifier();
+
+        if self.curr_token == TokenType::Identifier("if".to_string()) {
+            return Some(self.if_statement());
+        }
+
+        Some(self.block_statement())
+    }
+
+    /**
+     * block_statement
+     *   = "{"
+     *         statement_list
+     *     "}"
+     */
+    fn block_statement(&mut self) -> ASTNode {
+        self.eat(&TokenType::OpenBraces);
+        self.eat(&TokenType::Newline);
+        let statement_list = self.statement_list();
+        self.eat(&TokenType::CloseBraces);
+
+        ASTNode::BlockStatement(BlockStatement {
+            body: Box::new(statement_list),
         })
     }
 

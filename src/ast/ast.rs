@@ -15,6 +15,7 @@ pub enum ASTNode {
     UnaryExpression(Box<ASTNode>),
 
     IfStatement(IfStatement),
+    BlockStatement(BlockStatement),
 
     Variable(String),
     Number(f64),
@@ -50,6 +51,11 @@ pub struct FunctionCall {
 #[derive(Debug, Clone)]
 pub struct IfStatement {
     pub condition: Box<ASTNode>,
-    pub consequence: Box<Vec<ASTNode>>,
+    pub consequence: Box<ASTNode>,
     pub alternative: Option<Box<ASTNode>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BlockStatement {
+    pub body: Box<Vec<ASTNode>>,
 }

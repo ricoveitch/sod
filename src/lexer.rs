@@ -16,6 +16,7 @@ pub enum TokenType {
     DoubleEquals,
     EOF,
     Equals,
+    NotEquals,
     Or,
     ForwardSlash,
     GreaterThan,
@@ -107,6 +108,13 @@ impl Lexer {
         }
     }
 
+    fn read_not_equals(&self) -> (TokenType, usize) {
+        match self.peak_byte(1) {
+            Some(b) if b == &b'=' => (TokenType::NotEquals, 2),
+            _ => panic!("invalid character '!'",),
+        }
+    }
+
     fn read_comparison(&self) -> (TokenType, usize) {
         let start = self.peak_byte(0).unwrap();
 
@@ -177,6 +185,7 @@ impl Lexer {
             b'|' => self.read_or(),
             b'&' => self.read_and(),
             b'=' => self.read_equals(),
+            b'!' => self.read_not_equals(),
             b'>' | b'<' => self.read_comparison(),
             b if b.is_ascii_digit() => match self.read_digit() {
                 Ok(r) => r,
