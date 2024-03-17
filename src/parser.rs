@@ -129,7 +129,7 @@ impl Parser {
     fn statement_list(&mut self) -> Vec<ASTNode> {
         let mut statements = vec![];
 
-        while self.curr_token != TokenType::EOF && self.curr_token != TokenType::CloseBraces {
+        while self.curr_token != TokenType::EOF {
             if self.curr_token == TokenType::Newline {
                 self.eat(&TokenType::Newline);
                 continue;
@@ -208,18 +208,37 @@ impl Parser {
     /**
      * block_statement
      *   = "{"
-     *         statement_list
+     *         block_body
      *     "}"
      */
     fn block_statement(&mut self) -> ASTNode {
         self.eat(&TokenType::OpenBraces);
         self.eat(&TokenType::Newline);
-        let statement_list = self.statement_list();
+        let body = self.block_body();
         self.eat(&TokenType::CloseBraces);
 
         ASTNode::BlockStatement(BlockStatement {
-            body: Box::new(statement_list),
+            body: Box::new(body),
         })
+    }
+
+    /**
+     * block_body
+     *    = statement+
+     */
+    fn block_body(&mut self) -> Vec<ASTNode> {
+        let mut statements = vec![];
+        while self.curr_token != TokenType::CloseBraces {
+            if self.curr_token == TokenType::Newline {
+                self.eat(&TokenType::Newline);
+                continue;
+            }
+
+            statements.push(self.statement());
+            self.eat(&TokenType::Newline);
+        }
+
+        statements
     }
 
     /**
@@ -256,9 +275,7 @@ impl Parser {
 
     /**
      * function_expression
-     *   = "func" identifier "(" function_expression_args ")" "{"
-     *         statement_list
-     *     "}"
+     *   = "func" identifier "(" function_expression_args ")" block_statement
      */
     fn function_expression(&mut self) -> ASTNode {
         self.eat(&TokenType::Identifier("func".to_string()));
@@ -266,14 +283,11 @@ impl Parser {
         self.eat(&TokenType::OpenParenthesis);
         let func_args = self.function_expression_args();
         self.eat(&TokenType::CloseParenthesis);
-        self.eat(&TokenType::OpenBraces);
-        self.eat(&TokenType::Newline);
-        let statement_list = self.statement_list();
-        self.eat(&TokenType::CloseBraces);
+        let body = self.block_statement();
 
         ASTNode::FunctionExpression(FunctionExpression {
             name,
-            body: Box::new(statement_list),
+            body: Box::new(body),
             args: func_args,
         })
     }

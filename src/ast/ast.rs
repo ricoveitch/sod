@@ -38,7 +38,7 @@ pub struct VariableExpression {
 #[derive(Debug, Clone)]
 pub struct FunctionExpression {
     pub name: String,
-    pub body: Box<Vec<ASTNode>>,
+    pub body: Box<ASTNode>,
     pub args: Vec<String>,
 }
 

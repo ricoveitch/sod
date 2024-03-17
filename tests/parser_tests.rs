@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn conditional_panics() {
+    fn conditional_var_panic() {
         eval_expr("x=1\nif x != 1 {\n x = 2\n} else {\n y=5\nx=3\n}\ny");
     }
 }

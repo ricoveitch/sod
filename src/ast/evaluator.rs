@@ -1,5 +1,6 @@
 use super::ast::{
-    ASTNode, BinaryExpression, FunctionCall, FunctionExpression, IfStatement, VariableExpression,
+    ASTNode, BinaryExpression, BlockStatement, FunctionCall, FunctionExpression, IfStatement,
+    VariableExpression,
 };
 use super::symbol::Symbol;
 use super::symbol_table::SymbolTable;
@@ -31,12 +32,6 @@ impl ASTEvaluator {
         }
     }
 
-    fn eval_statement_list(&mut self, statement_list: Vec<ASTNode>) {
-        for node in statement_list {
-            self.eval_node(node);
-        }
-    }
-
     fn eval_node(&mut self, node: ASTNode) -> Option<Symbol> {
         match node {
             ASTNode::BinaryExpression(be) => self.eval_binary_expression(be),
@@ -56,10 +51,8 @@ impl ASTEvaluator {
                 self.eval_if_statement(is);
                 None
             }
-            ASTNode::BlockStatement(bs) => {
-                self.eval_statement_list(*bs.body);
-                return None;
-            }
+            ASTNode::BlockStatement(bs) => self.eval_block_statement(bs),
+            ASTNode::ReturnExpression(expr) => self.eval_node(*expr),
             ASTNode::Number(value) => Some(Symbol::Number(value)),
             ASTNode::Boolean(value) => Some(Symbol::Boolean(value)),
             _ => None,
@@ -70,10 +63,20 @@ impl ASTEvaluator {
         match self.symbol_table.get(&name) {
             Some(symbol) => symbol.clone(),
             None => {
-                println!("{:?}", self.symbol_table.scoped_table);
                 panic!("undeclared variable '{}'", name);
             }
         }
+    }
+
+    fn eval_block_statement(&mut self, block_statement: BlockStatement) -> Option<Symbol> {
+        for node in *block_statement.body {
+            match node {
+                ASTNode::ReturnExpression(expr) => return self.eval_node(*expr),
+                _ => self.eval_node(node),
+            };
+        }
+
+        None
     }
 
     fn eval_if_statement(&mut self, if_statement: IfStatement) {
@@ -133,21 +136,12 @@ impl ASTEvaluator {
         };
 
         self.validate_function_call(&func_call, &func_expr);
+
         self.push_function(&func_call, &func_expr);
-
-        for line in *func_expr.body {
-            match line {
-                ASTNode::ReturnExpression(expr) => {
-                    let res = self.eval_node(*expr);
-                    self.symbol_table.pop_scope();
-                    return res;
-                }
-                _ => self.eval_node(line),
-            };
-        }
-
+        let res = self.eval_node(*func_expr.body);
         self.symbol_table.pop_scope();
-        None
+
+        res
     }
 
     fn eval_variable_expression(&mut self, node: VariableExpression) {
