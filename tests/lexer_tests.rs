@@ -50,4 +50,16 @@ mod tests {
             ],
         );
     }
+
+    #[test]
+    fn strings() {
+        assert_tokens(
+            Lexer::new(r#"x="foo""#),
+            vec![
+                TokenType::Identifier("x".to_string()),
+                TokenType::Equals,
+                TokenType::String("foo".to_string()),
+            ],
+        );
+    }
 }

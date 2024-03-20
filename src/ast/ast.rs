@@ -1,7 +1,5 @@
 use crate::lexer::TokenType;
 
-use super::symbol::Symbol;
-
 #[derive(Debug, Clone)]
 pub enum ASTNode {
     Program(Box<Vec<ASTNode>>),
@@ -20,6 +18,7 @@ pub enum ASTNode {
     Variable(String),
     Number(f64),
     Boolean(bool),
+    String(String),
 }
 
 #[derive(Debug, Clone)]
@@ -42,10 +41,16 @@ pub struct FunctionExpression {
     pub args: Vec<String>,
 }
 
+impl PartialEq for FunctionExpression {
+    fn eq(&self, _: &Self) -> bool {
+        false
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FunctionCall {
     pub name: String,
-    pub args: Vec<Symbol>,
+    pub args: Vec<ASTNode>,
 }
 
 #[derive(Debug, Clone)]

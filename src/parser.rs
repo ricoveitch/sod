@@ -1,12 +1,9 @@
 use core::panic;
 
 use crate::{
-    ast::{
-        ast::{
-            ASTNode, BinaryExpression, BlockStatement, FunctionCall, FunctionExpression,
-            IfStatement, VariableExpression,
-        },
-        symbol::Symbol,
+    ast::ast::{
+        ASTNode, BinaryExpression, BlockStatement, FunctionCall, FunctionExpression, IfStatement,
+        VariableExpression,
     },
     lexer::{self, TokenType},
 };
@@ -23,6 +20,10 @@ impl Parser {
         Parser { lexer, curr_token }
     }
 
+    fn advance_token(&mut self) {
+        self.curr_token = self.lexer.next_token();
+    }
+
     pub fn parse(&mut self) -> ASTNode {
         self.program()
     }
@@ -34,11 +35,16 @@ impl Parser {
         }
     }
 
-    fn eat_number(&mut self) -> TokenType {
-        match self.curr_token {
-            TokenType::Decimal(_) | TokenType::Integer(_) => self.eat(&self.curr_token.clone()),
-            _ => panic!("unexpected token {:?}, expected a number", self.curr_token),
-        }
+    fn eat_literal(&mut self) -> ASTNode {
+        let node = match &self.curr_token {
+            TokenType::Decimal(dec) => ASTNode::Number(*dec),
+            TokenType::Integer(int) => ASTNode::Number(*int as f64),
+            TokenType::String(s) => ASTNode::String(s.clone()),
+            _ => panic!("unexpected token {:?}", self.curr_token),
+        };
+
+        self.advance_token();
+        node
     }
 
     fn eat_operator(&mut self) -> TokenType {
@@ -90,7 +96,7 @@ impl Parser {
         }
 
         let previous_token = self.curr_token.clone();
-        self.curr_token = self.lexer.next_token();
+        self.advance_token();
         previous_token
     }
 
@@ -318,20 +324,14 @@ impl Parser {
      *    = parenthesized_expression
      *    / unary_expression
      *    / return_expression
-     *    / NUMBER
+     *    / LITERAL
      */
     fn prefix(&mut self) -> ASTNode {
         match &self.curr_token {
-            TokenType::OpenParenthesis => return self.parenthesized_expression(),
-            TokenType::Minus => return self.unary_expression(),
-            TokenType::Identifier(_) => return self.identifier(),
-            _ => (),
-        };
-
-        match self.eat_number() {
-            TokenType::Decimal(value) => ASTNode::Number(value),
-            TokenType::Integer(value) => ASTNode::Number(value as f64),
-            _ => panic!("invalid prefix"),
+            TokenType::OpenParenthesis => self.parenthesized_expression(),
+            TokenType::Minus => self.unary_expression(),
+            TokenType::Identifier(_) => self.identifier(),
+            _ => self.eat_literal(),
         }
     }
 
@@ -403,23 +403,21 @@ impl Parser {
 
     /**
      * function_call_args
-     *   = ((identifier | NUMBER),)*
+     *   = ((identifier | LITERAL),)*
      */
-    fn function_call_args(&mut self) -> Vec<Symbol> {
+    fn function_call_args(&mut self) -> Vec<ASTNode> {
         if self.curr_token == TokenType::CloseParenthesis {
             return vec![];
         }
 
         let mut args = vec![];
         loop {
-            match &self.curr_token {
-                TokenType::Identifier(_) => args.push(Symbol::Variable(self.eat_identifier())),
-                _ => match self.eat_number() {
-                    TokenType::Decimal(value) => args.push(Symbol::Number(value)),
-                    TokenType::Integer(value) => args.push(Symbol::Number(value as f64)),
-                    _ => panic!("invalid function argument"),
-                },
+            let node = match &self.curr_token {
+                TokenType::Identifier(_) => ASTNode::Variable(self.eat_identifier()),
+                _ => self.eat_literal(),
             };
+            args.push(node);
+
             if self.curr_token == TokenType::CloseParenthesis {
                 break;
             }

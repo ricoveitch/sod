@@ -55,6 +55,7 @@ impl ASTEvaluator {
             ASTNode::ReturnExpression(expr) => self.eval_node(*expr),
             ASTNode::Number(value) => Some(Symbol::Number(value)),
             ASTNode::Boolean(value) => Some(Symbol::Boolean(value)),
+            ASTNode::String(value) => Some(Symbol::String(value)),
             _ => None,
         }
     }
@@ -113,13 +114,12 @@ impl ASTEvaluator {
 
     fn push_function(&mut self, func_call: &FunctionCall, func_expr: &FunctionExpression) {
         let mut args = vec![];
-        // evaluate any variables in args
         for (arg_name, arg_value) in func_expr.args.iter().zip(func_call.args.iter()) {
-            let value = match arg_value {
-                Symbol::Variable(var_name) => self.get_symbol(&var_name),
-                _ => arg_value.clone(),
+            let symbol = match self.eval_node(arg_value.clone()) {
+                Some(symbol) => symbol,
+                None => panic!("invalid function argument for {}", func_expr.name),
             };
-            args.push((arg_name, value));
+            args.push((arg_name, symbol));
         }
 
         self.symbol_table.push_scope(ScopeKind::FunctionBlock);

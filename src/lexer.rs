@@ -30,6 +30,7 @@ pub enum TokenType {
     Plus,
     Integer(usize),
     Decimal(f64),
+    String(String),
     Identifier(String),
 }
 
@@ -52,9 +53,9 @@ impl Lexer {
         }
     }
 
-    fn read_while(&self, mut pred: impl FnMut(&u8) -> bool) -> (Vec<u8>, usize) {
+    fn read_while(&self, mut pred: impl FnMut(&u8) -> bool, offset: usize) -> (Vec<u8>, usize) {
         let mut bytes = vec![];
-        for byte in self.src.iter().skip(self.cursor) {
+        for byte in self.src.iter().skip(self.cursor + offset) {
             if pred(byte) {
                 bytes.push(byte.clone())
             } else {
@@ -67,17 +68,20 @@ impl Lexer {
 
     fn read_digit(&self) -> Result<(TokenType, usize), Box<dyn Error>> {
         let mut seen_dot = false;
-        let (bytes, bytes_read) = self.read_while(|b: &u8| {
-            if b == &b'.' {
-                if seen_dot {
-                    return false;
+        let (bytes, bytes_read) = self.read_while(
+            |b: &u8| {
+                if b == &b'.' {
+                    if seen_dot {
+                        return false;
+                    }
+                    seen_dot = true;
+                    return true;
                 }
-                seen_dot = true;
-                return true;
-            }
 
-            b.is_ascii_digit()
-        });
+                b.is_ascii_digit()
+            },
+            0,
+        );
 
         let s = String::from_utf8(bytes)?;
 
@@ -91,7 +95,7 @@ impl Lexer {
     }
 
     fn read_identifier(&self) -> (TokenType, usize) {
-        let (bytes, bytes_read) = self.read_while(|b| b.is_ascii_alphabetic());
+        let (bytes, bytes_read) = self.read_while(|b| b.is_ascii_alphabetic(), 0);
 
         let word = match String::from_utf8(bytes) {
             Ok(w) => w,
@@ -153,6 +157,17 @@ impl Lexer {
         (TokenType::Or, 2)
     }
 
+    fn read_string(&self) -> (TokenType, usize) {
+        let (s_bytes, s_bytes_read) = self.read_while(|b| *b != b'"', 1);
+
+        let s = match String::from_utf8(s_bytes) {
+            Ok(s) => s,
+            Err(_) => panic!("invalid string"),
+        };
+
+        (TokenType::String(s), s_bytes_read + 2)
+    }
+
     fn skip_space(&mut self) {
         while let Some(byte) = self.peak_byte(0) {
             if byte != &b' ' {
@@ -187,6 +202,7 @@ impl Lexer {
             b'=' => self.read_equals(),
             b'!' => self.read_not_equals(),
             b'>' | b'<' => self.read_comparison(),
+            b'"' => self.read_string(),
             b if b.is_ascii_digit() => match self.read_digit() {
                 Ok(r) => r,
                 Err(e) => panic!("{}", e),
