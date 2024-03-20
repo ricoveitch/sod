@@ -1,91 +1,15 @@
 use std::collections::HashMap;
 
-use super::symbol::Symbol;
-
-#[derive(PartialEq)]
-pub enum ScopeKind {
-    Global,
-    FunctionBlock,
-    ConditionalBlock,
-}
-
-struct Scope {
-    kind: ScopeKind,
-    name: ScopeName,
-}
+use super::{
+    scope::{ScopeKind, ScopeStack},
+    symbol::Symbol,
+};
 
 type ScopeName = String;
 type SymbolName = String;
 
-struct ScopeStack {
-    scope: Vec<Vec<Scope>>,
-}
-
-impl ScopeStack {
-    pub fn new() -> ScopeStack {
-        ScopeStack {
-            scope: vec![vec![Scope {
-                kind: ScopeKind::Global,
-                name: "global".to_string(),
-            }]],
-        }
-    }
-
-    pub fn curr_stack(&self) -> &Vec<Scope> {
-        self.scope.last().unwrap()
-    }
-
-    pub fn curr(&self) -> &Scope {
-        return self.curr_stack().last().unwrap();
-    }
-
-    fn push_scope_stack(&mut self, with: ScopeKind) {
-        self.scope.push(vec![
-            Scope {
-                kind: ScopeKind::Global,
-                name: "global".to_string(),
-            },
-            Scope {
-                name: "".to_string(),
-                kind: with,
-            },
-        ])
-    }
-
-    fn push_scope(&mut self, with: ScopeKind) {
-        match self.scope.last_mut() {
-            Some(stack) => stack.push(Scope {
-                name: "".to_string(),
-                kind: with,
-            }),
-            None => panic!("no scope found"),
-        };
-    }
-
-    pub fn push(&mut self, kind: ScopeKind) {
-        match kind {
-            ScopeKind::ConditionalBlock => self.push_scope(kind),
-            ScopeKind::FunctionBlock => self.push_scope_stack(kind),
-            ScopeKind::Global => panic!("not able to push another global scope"),
-        };
-    }
-
-    pub fn pop(&mut self) -> Scope {
-        let popped_scope = match self.scope.last_mut().unwrap().pop() {
-            Some(s) => s,
-            None => panic!("scope out of bounds"),
-        };
-
-        if self.scope.len() > 1 && self.curr().kind == ScopeKind::Global {
-            self.scope.pop();
-        }
-
-        popped_scope
-    }
-}
-
 pub struct SymbolTable {
-    pub scoped_table: HashMap<ScopeName, HashMap<SymbolName, Symbol>>,
+    scoped_table: HashMap<ScopeName, HashMap<SymbolName, Symbol>>,
     scope: ScopeStack,
 }
 
@@ -151,8 +75,8 @@ impl SymbolTable {
     }
 
     pub fn push_scope(&mut self, kind: ScopeKind) {
-        self.scope.push(kind);
-        self.scoped_table.insert("".to_string(), HashMap::new());
+        let scope_name = self.scope.push(kind);
+        self.scoped_table.insert(scope_name, HashMap::new());
     }
 
     pub fn pop_scope(&mut self) {

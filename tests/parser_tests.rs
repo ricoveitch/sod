@@ -82,6 +82,20 @@ mod tests {
         x",
             Symbol::Number(20.0),
         );
+        assert_expr(
+            "
+        x=1
+        y=0
+        if x == 1 {
+            t = 1
+            if y == 0 {
+                z = 1
+            }
+            x = t + 1
+        }
+        x",
+            Symbol::Number(2.0),
+        );
     }
 
     #[test]

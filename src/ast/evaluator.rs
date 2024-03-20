@@ -5,7 +5,7 @@ use super::ast::{
 use super::symbol::Symbol;
 use super::symbol_table::SymbolTable;
 use super::util;
-use crate::ast::symbol_table::ScopeKind;
+use crate::ast::scope::ScopeKind;
 use crate::lexer::TokenType;
 
 pub struct ASTEvaluator {
