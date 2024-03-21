@@ -1,5 +1,3 @@
-use uuid::Uuid;
-
 #[derive(PartialEq)]
 pub enum ScopeKind {
     Global,
@@ -8,12 +6,14 @@ pub enum ScopeKind {
 }
 
 pub struct Scope {
-    pub name: String,
+    pub id: usize,
     kind: ScopeKind,
 }
+pub const GLOBAL_SCOPE_ID: usize = 0;
 
 pub struct ScopeStack {
     scope: Vec<Vec<Scope>>,
+    counter: usize,
 }
 
 impl ScopeStack {
@@ -21,8 +21,9 @@ impl ScopeStack {
         ScopeStack {
             scope: vec![vec![Scope {
                 kind: ScopeKind::Global,
-                name: "global".to_string(),
+                id: GLOBAL_SCOPE_ID,
             }]],
+            counter: GLOBAL_SCOPE_ID + 1,
         }
     }
 
@@ -34,39 +35,36 @@ impl ScopeStack {
         return self.curr_stack().last().unwrap();
     }
 
-    fn push_scope_stack(&mut self, with: ScopeKind) -> String {
-        let name = Uuid::new_v4().to_string();
+    fn push_scope_stack(&mut self, with: ScopeKind) -> usize {
+        let id = self.counter;
         self.scope.push(vec![
             Scope {
                 kind: ScopeKind::Global,
-                name: "global".to_string(),
+                id: GLOBAL_SCOPE_ID,
             },
-            Scope {
-                name: name.clone(),
-                kind: with,
-            },
+            Scope { id, kind: with },
         ]);
-        name
+        id
     }
 
-    fn push_scope(&mut self, with: ScopeKind) -> String {
-        let name = Uuid::new_v4().to_string();
+    fn push_scope(&mut self, with: ScopeKind) -> usize {
+        let id = self.counter;
         match self.scope.last_mut() {
-            Some(stack) => stack.push(Scope {
-                name: name.clone(),
-                kind: with,
-            }),
+            Some(stack) => stack.push(Scope { id, kind: with }),
             None => panic!("no scope found"),
         };
-        name
+        id
     }
 
-    pub fn push(&mut self, kind: ScopeKind) -> String {
-        match kind {
+    pub fn push(&mut self, kind: ScopeKind) -> usize {
+        let id = match kind {
             ScopeKind::ConditionalBlock => self.push_scope(kind),
             ScopeKind::FunctionBlock => self.push_scope_stack(kind),
             ScopeKind::Global => panic!("not able to push another global scope"),
-        }
+        };
+
+        self.counter += 1;
+        id
     }
 
     pub fn pop(&mut self) -> Scope {
@@ -79,6 +77,7 @@ impl ScopeStack {
             self.scope.pop();
         }
 
+        self.counter -= 1;
         popped_scope
     }
 }
