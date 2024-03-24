@@ -19,6 +19,8 @@ pub enum ASTNode {
     Number(f64),
     Boolean(bool),
     String(String),
+
+    Command(Box<Vec<ASTNode>>),
 }
 
 #[derive(Debug, Clone)]
@@ -31,7 +33,7 @@ pub struct BinaryExpression {
 #[derive(Debug, Clone)]
 pub struct VariableExpression {
     pub name: String,
-    pub value: Box<ASTNode>,
+    pub rhs: Box<ASTNode>,
 }
 
 #[derive(Debug, Clone)]

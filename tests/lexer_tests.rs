@@ -1,13 +1,21 @@
 use orca::lexer::Lexer;
 use orca::lexer::TokenType;
 
-fn assert_tokens(mut l: Lexer, expected: Vec<TokenType>) {
+fn assert_tokens(mut l: Lexer, expected: Vec<TokenType>, cmd: bool) {
+    let mut next = || {
+        if cmd {
+            return l.next_cmd_token();
+        } else {
+            return l.next_token();
+        };
+    };
+
     for expect in expected {
-        let t = l.next_token();
-        assert_eq!(t, expect);
+        let t = next();
+        assert_eq!(expect, t);
     }
 
-    assert_eq!(l.next_token(), TokenType::EOF);
+    assert_eq!(TokenType::EOF, next());
 }
 
 #[cfg(test)]
@@ -26,6 +34,7 @@ mod tests {
                 TokenType::Minus,
                 TokenType::Decimal(1.2),
             ],
+            false,
         );
 
         assert_tokens(
@@ -36,6 +45,7 @@ mod tests {
                 TokenType::Integer(2),
                 TokenType::Newline,
             ],
+            false,
         );
     }
 
@@ -48,6 +58,7 @@ mod tests {
                 TokenType::Equals,
                 TokenType::Integer(1),
             ],
+            false,
         );
     }
 
@@ -60,6 +71,27 @@ mod tests {
                 TokenType::Equals,
                 TokenType::String("foo".to_string()),
             ],
+            false,
+        );
+    }
+
+    #[test]
+    fn bash() {
+        assert_tokens(
+            Lexer::new("ls -la >> foo.txt"),
+            vec![
+                TokenType::Identifier("ls".to_string()),
+                TokenType::Whitespace,
+                TokenType::Minus,
+                TokenType::Identifier("la".to_string()),
+                TokenType::Whitespace,
+                TokenType::AppendOutput,
+                TokenType::Whitespace,
+                TokenType::Identifier("foo".to_string()),
+                TokenType::Dot,
+                TokenType::Identifier("txt".to_string()),
+            ],
+            true,
         );
     }
 }

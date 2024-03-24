@@ -1,27 +1,38 @@
 use core::panic;
+use std::collections::HashSet;
 
 use crate::{
     ast::ast::{
         ASTNode, BinaryExpression, BlockStatement, FunctionCall, FunctionExpression, IfStatement,
         VariableExpression,
     },
+    common::bash,
     lexer::{self, TokenType},
 };
 
 pub struct Parser {
     lexer: lexer::Lexer,
     curr_token: TokenType,
+    commands: HashSet<String>,
 }
 
 impl Parser {
     pub fn new(src: &str) -> Parser {
         let mut lexer = lexer::Lexer::new(src);
         let curr_token = lexer.next_token();
-        Parser { lexer, curr_token }
+        Parser {
+            lexer,
+            curr_token,
+            commands: bash::get_commands(),
+        }
     }
 
     fn advance_token(&mut self) {
         self.curr_token = self.lexer.next_token();
+    }
+
+    fn advance_cmd_token(&mut self) {
+        self.curr_token = self.lexer.next_cmd_token();
     }
 
     pub fn parse(&mut self) -> ASTNode {
@@ -45,6 +56,11 @@ impl Parser {
 
         self.advance_token();
         node
+    }
+
+    fn eat_bool(&mut self, b: bool) -> ASTNode {
+        self.advance_token();
+        ASTNode::Boolean(b)
     }
 
     fn eat_operator(&mut self) -> TokenType {
@@ -72,7 +88,7 @@ impl Parser {
     fn eat_identifier(&mut self) -> String {
         let curr_token = self.curr_token.clone();
         match &curr_token {
-            TokenType::Identifier(ident) => {
+            TokenType::Identifier(ident) | TokenType::EscapedIdentifier(ident) => {
                 self.eat(&curr_token);
                 ident.clone()
             }
@@ -254,10 +270,7 @@ impl Parser {
     fn expression(&mut self, precedence: usize) -> ASTNode {
         let mut left = self.prefix();
 
-        while self.curr_token != TokenType::EOF
-            && self.curr_token != TokenType::Newline
-            && precedence < self.get_precedence(&self.curr_token)
-        {
+        while !self.curr_token.is_end_line() && precedence < self.get_precedence(&self.curr_token) {
             left = self.infix(left, &self.curr_token.clone())
         }
 
@@ -275,7 +288,7 @@ impl Parser {
 
         ASTNode::VariableExpression(VariableExpression {
             name,
-            value: Box::new(expression),
+            rhs: Box::new(expression),
         })
     }
 
@@ -321,32 +334,55 @@ impl Parser {
 
     /**
      * prefix
-     *    = parenthesized_expression
-     *    / unary_expression
-     *    / return_expression
-     *    / LITERAL
+     *   = parenthesized_expression
+     *   / unary_expression
+     *   / return_expression
+     *   / function_call
+     *   / command
+     *   / LITERAL
      */
     fn prefix(&mut self) -> ASTNode {
         match &self.curr_token {
             TokenType::OpenParenthesis => self.parenthesized_expression(),
             TokenType::Minus => self.unary_expression(),
-            TokenType::Identifier(_) => self.identifier(),
+            TokenType::Identifier(ident) => self.identifier(ident.to_owned()),
             _ => self.eat_literal(),
         }
     }
 
-    fn identifier(&mut self) -> ASTNode {
-        let ident = self.eat_identifier();
-        if self.curr_token == TokenType::OpenParenthesis {
-            return self.function_call(ident);
+    fn identifier(&mut self, ident: String) -> ASTNode {
+        if self.lookahead(1) == TokenType::OpenParenthesis {
+            return self.function_call();
         }
 
         match ident.as_str() {
             "return" => self.return_expression(),
-            "true" => ASTNode::Boolean(true),
-            "false" => ASTNode::Boolean(false),
-            _ => ASTNode::Variable(ident),
+            "true" => self.eat_bool(true),
+            "false" => self.eat_bool(false),
+            s if self.commands.contains(s) => self.command(ident),
+            _ => ASTNode::Variable(self.eat_identifier()),
         }
+    }
+
+    /*
+     * command
+     * = command (node)*
+     */
+    fn command(&mut self, cmd: String) -> ASTNode {
+        let mut tokens = vec![ASTNode::String(cmd)];
+        self.advance_cmd_token();
+
+        while !self.curr_token.is_end_line() {
+            let node = match &self.curr_token {
+                TokenType::EscapedIdentifier(ident) => ASTNode::Variable(ident.to_string()),
+                t => ASTNode::String(t.to_string()),
+            };
+
+            self.advance_cmd_token();
+            tokens.push(node);
+        }
+
+        ASTNode::Command(Box::new(tokens))
     }
 
     /**
@@ -386,6 +422,7 @@ impl Parser {
      *    = "return" expression
      */
     fn return_expression(&mut self) -> ASTNode {
+        self.eat(&TokenType::Identifier("return".to_string()));
         let expression = self.expression(0);
         ASTNode::ReturnExpression(Box::new(expression))
     }
@@ -394,7 +431,8 @@ impl Parser {
      * function_call
      *    = identifier "(" function_call_args ")"
      */
-    fn function_call(&mut self, fname: String) -> ASTNode {
+    fn function_call(&mut self) -> ASTNode {
+        let fname = self.eat_identifier();
         self.eat(&TokenType::OpenParenthesis);
         let args = self.function_call_args();
         self.eat(&TokenType::CloseParenthesis);

@@ -2,10 +2,11 @@ use super::ast::{
     ASTNode, BinaryExpression, BlockStatement, FunctionCall, FunctionExpression, IfStatement,
     VariableExpression,
 };
+use super::scope::ScopeKind;
 use super::symbol::Symbol;
 use super::symbol_table::SymbolTable;
 use super::util;
-use crate::ast::scope::ScopeKind;
+use crate::common::bash;
 use crate::lexer::TokenType;
 
 pub struct ASTEvaluator {
@@ -56,6 +57,7 @@ impl ASTEvaluator {
             ASTNode::Number(value) => Some(Symbol::Number(value)),
             ASTNode::Boolean(value) => Some(Symbol::Boolean(value)),
             ASTNode::String(value) => Some(Symbol::String(value)),
+            ASTNode::Command(cmd) => Some(self.eval_command(*cmd)),
             _ => None,
         }
     }
@@ -67,6 +69,18 @@ impl ASTEvaluator {
                 panic!("undeclared variable '{}'", name);
             }
         }
+    }
+
+    fn eval_command(&mut self, tokens: Vec<ASTNode>) -> Symbol {
+        let mut cmd_string = "".to_owned();
+        for node in tokens {
+            if let Some(sym) = self.eval_node(node) {
+                cmd_string.push_str(sym.to_string().as_str());
+            }
+        }
+
+        let output = bash::run_cmd(&cmd_string);
+        Symbol::String(output)
     }
 
     fn eval_block_statement(&mut self, block_statement: BlockStatement) -> Option<Symbol> {
@@ -145,8 +159,8 @@ impl ASTEvaluator {
     }
 
     fn eval_variable_expression(&mut self, node: VariableExpression) {
-        if let Some(val) = self.eval_node(*node.value) {
-            self.symbol_table.insert(&node.name, val);
+        if let Some(symbol) = self.eval_node(*node.rhs) {
+            self.symbol_table.insert(&node.name, symbol);
         }
     }
 
