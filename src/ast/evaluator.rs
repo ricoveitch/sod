@@ -7,7 +7,7 @@ use super::symbol::Symbol;
 use super::symbol_table::SymbolTable;
 use super::util;
 use crate::common::bash;
-use crate::lexer::TokenType;
+use crate::lexer::token::TokenType;
 
 pub struct ASTEvaluator {
     symbol_table: SymbolTable,
@@ -201,7 +201,7 @@ impl ASTEvaluator {
         let (l, r) = match (left, right) {
             (Symbol::Number(ln), Symbol::Number(rn)) => (ln, rn),
             _ => panic!(
-                "{:?} {:?} {:?}: can only perform mathematical expressions on numbers",
+                "{:?} {} {:?}: can only perform mathematical expressions on numbers",
                 left, operator, right
             ),
         };
@@ -212,7 +212,7 @@ impl ASTEvaluator {
             TokenType::Asterisk => l * r,
             TokenType::ForwardSlash => l / r,
             TokenType::Carat => l.powf(*r),
-            _ => panic!("invalid operator {:?}", operator),
+            _ => panic!("invalid operator {}", operator),
         };
 
         Symbol::Number(res)
@@ -220,9 +220,10 @@ impl ASTEvaluator {
 
     fn compare(&self, left: &Symbol, operator: &TokenType, right: &Symbol) -> Symbol {
         match (left, right) {
+            // TODO: change this to allow true && echo 'foo'
             (Symbol::Number(ln), Symbol::Number(rn)) => self.compare_number(*ln, operator, *rn),
             (Symbol::Boolean(lb), Symbol::Boolean(rb)) => self.compare_bool(*lb, operator, *rb),
-            _ => panic!("{:?} {:?} {:?}: type mismatch", left, operator, right),
+            _ => panic!("type mismatch: {} {} {}", left, operator.to_string(), right),
         }
     }
 
@@ -233,7 +234,7 @@ impl ASTEvaluator {
             TokenType::And => left && right,
             TokenType::Or => left || right,
             _ => panic!(
-                "{:?} {:?} {:?}: unable to compare booleans",
+                "{:?} {} {:?}: unable to compare booleans",
                 left, operator, right
             ),
         };
@@ -247,8 +248,8 @@ impl ASTEvaluator {
             TokenType::NotEquals => left != right,
             TokenType::GreaterThan => left > right,
             TokenType::LessThan => left < right,
-            TokenType::GreaterThanOrEqualTo => left >= right,
-            TokenType::LessThanOrEqualTo => left <= right,
+            TokenType::Ge => left >= right,
+            TokenType::Le => left <= right,
             _ => panic!("expected a comparison"),
         };
 

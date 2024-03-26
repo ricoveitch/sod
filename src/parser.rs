@@ -7,7 +7,8 @@ use crate::{
         VariableExpression,
     },
     common::bash,
-    lexer::{self, TokenType},
+    lexer::lexer,
+    lexer::token::TokenType,
 };
 
 pub struct Parser {
@@ -50,8 +51,8 @@ impl Parser {
         let node = match &self.curr_token {
             TokenType::Decimal(dec) => ASTNode::Number(*dec),
             TokenType::Integer(int) => ASTNode::Number(*int as f64),
-            TokenType::String(s) => ASTNode::String(s.clone()),
-            _ => panic!("unexpected token {:?}", self.curr_token),
+            TokenType::String(s) => ASTNode::String(s.value.to_string()),
+            _ => panic!("unexpected token {}", self.curr_token),
         };
 
         self.advance_token();
@@ -72,16 +73,13 @@ impl Parser {
             | TokenType::Carat
             | TokenType::GreaterThan
             | TokenType::LessThan
-            | TokenType::GreaterThanOrEqualTo
-            | TokenType::LessThanOrEqualTo
+            | TokenType::Ge
+            | TokenType::Le
             | TokenType::DoubleEquals
             | TokenType::NotEquals
             | TokenType::And
             | TokenType::Or => self.eat(&self.curr_token.clone()),
-            _ => panic!(
-                "unexpected token {:?}, expected an operator",
-                self.curr_token
-            ),
+            _ => panic!("unexpected token {}, expected an operator", self.curr_token),
         }
     }
 
@@ -93,7 +91,7 @@ impl Parser {
                 ident.clone()
             }
             _ => panic!(
-                "unexpected token {:?}, expected an identifier",
+                "unexpected token {}, expected an identifier",
                 self.curr_token
             ),
         }
@@ -106,7 +104,7 @@ impl Parser {
 
         if expected_token != &self.curr_token {
             panic!(
-                "unexpected token {:?}, expected {:?}",
+                "unexpected token {}, expected {}",
                 self.curr_token, expected_token
             )
         }
@@ -127,8 +125,8 @@ impl Parser {
             &TokenType::NotEquals => 1,
             &TokenType::GreaterThan => 1,
             &TokenType::LessThan => 1,
-            &TokenType::GreaterThanOrEqualTo => 1,
-            &TokenType::LessThanOrEqualTo => 1,
+            &TokenType::Ge => 1,
+            &TokenType::Le => 1,
             &TokenType::And => 1,
             &TokenType::Or => 1,
             _ => 0,
@@ -299,9 +297,9 @@ impl Parser {
     fn function_expression(&mut self) -> ASTNode {
         self.eat(&TokenType::Identifier("func".to_string()));
         let name = self.eat_identifier();
-        self.eat(&TokenType::OpenParenthesis);
+        self.eat(&TokenType::OpenParen);
         let func_args = self.function_expression_args();
-        self.eat(&TokenType::CloseParenthesis);
+        self.eat(&TokenType::CloseParen);
         let body = self.block_statement();
 
         ASTNode::FunctionExpression(FunctionExpression {
@@ -316,14 +314,14 @@ impl Parser {
      *   = (identifier,)*
      */
     fn function_expression_args(&mut self) -> Vec<String> {
-        if self.curr_token == TokenType::CloseParenthesis {
+        if self.curr_token == TokenType::CloseParen {
             return vec![];
         }
 
         let mut args = vec![];
         loop {
             args.push(self.eat_identifier());
-            if self.curr_token == TokenType::CloseParenthesis {
+            if self.curr_token == TokenType::CloseParen {
                 break;
             }
 
@@ -343,7 +341,7 @@ impl Parser {
      */
     fn prefix(&mut self) -> ASTNode {
         match &self.curr_token {
-            TokenType::OpenParenthesis => self.parenthesized_expression(),
+            TokenType::OpenParen => self.parenthesized_expression(),
             TokenType::Minus => self.unary_expression(),
             TokenType::Identifier(ident) => self.identifier(ident.to_owned()),
             _ => self.eat_literal(),
@@ -351,7 +349,7 @@ impl Parser {
     }
 
     fn identifier(&mut self, ident: String) -> ASTNode {
-        if self.lookahead(1) == TokenType::OpenParenthesis {
+        if self.lookahead(1) == TokenType::OpenParen {
             return self.function_call();
         }
 
@@ -411,9 +409,9 @@ impl Parser {
      *    = "(" expression ")"
      */
     fn parenthesized_expression(&mut self) -> ASTNode {
-        self.eat(&TokenType::OpenParenthesis);
+        self.eat(&TokenType::OpenParen);
         let expression = self.expression(0);
-        self.eat(&TokenType::CloseParenthesis);
+        self.eat(&TokenType::CloseParen);
         expression
     }
 
@@ -433,9 +431,9 @@ impl Parser {
      */
     fn function_call(&mut self) -> ASTNode {
         let fname = self.eat_identifier();
-        self.eat(&TokenType::OpenParenthesis);
+        self.eat(&TokenType::OpenParen);
         let args = self.function_call_args();
-        self.eat(&TokenType::CloseParenthesis);
+        self.eat(&TokenType::CloseParen);
         ASTNode::FunctionCall(FunctionCall { name: fname, args })
     }
 
@@ -444,7 +442,7 @@ impl Parser {
      *   = ((identifier | LITERAL),)*
      */
     fn function_call_args(&mut self) -> Vec<ASTNode> {
-        if self.curr_token == TokenType::CloseParenthesis {
+        if self.curr_token == TokenType::CloseParen {
             return vec![];
         }
 
@@ -456,7 +454,7 @@ impl Parser {
             };
             args.push(node);
 
-            if self.curr_token == TokenType::CloseParenthesis {
+            if self.curr_token == TokenType::CloseParen {
                 break;
             }
 

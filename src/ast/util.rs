@@ -1,4 +1,4 @@
-use crate::lexer::TokenType;
+use crate::lexer::token::TokenType;
 
 pub fn is_comparative_operator(operator: &TokenType) -> bool {
     match operator {
@@ -8,8 +8,8 @@ pub fn is_comparative_operator(operator: &TokenType) -> bool {
         | TokenType::NotEquals
         | TokenType::GreaterThan
         | TokenType::LessThan
-        | TokenType::GreaterThanOrEqualTo
-        | TokenType::LessThanOrEqualTo => true,
+        | TokenType::Ge
+        | TokenType::Le => true,
         _ => false,
     }
 }

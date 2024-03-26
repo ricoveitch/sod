@@ -1,5 +1,5 @@
-use orca::lexer::Lexer;
-use orca::lexer::TokenType;
+use orca::lexer::lexer::Lexer;
+use orca::lexer::token::{StringToken, TokenType};
 
 fn assert_tokens(mut l: Lexer, expected: Vec<TokenType>, cmd: bool) {
     let mut next = || {
@@ -69,7 +69,10 @@ mod tests {
             vec![
                 TokenType::Identifier("x".to_string()),
                 TokenType::Equals,
-                TokenType::String("foo".to_string()),
+                TokenType::String(StringToken {
+                    value: "foo".to_string(),
+                    quote: '\"',
+                }),
             ],
             false,
         );
@@ -92,6 +95,15 @@ mod tests {
                 TokenType::Identifier("txt".to_string()),
             ],
             true,
+        );
+    }
+
+    #[test]
+    fn line_comment() {
+        assert_tokens(
+            Lexer::new("1 #foo bar123 1780*() !@#$%^&*()_+|}{"),
+            vec![TokenType::Integer(1), TokenType::EOF],
+            false,
         );
     }
 }

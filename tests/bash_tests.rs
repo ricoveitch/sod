@@ -10,5 +10,15 @@ fn scripts() {
 output=ls $path | grep '..tmp'
 output"#,
         Symbol::String("gear.tmp\n".to_string()),
-    )
+    );
+
+    assert_expr(r#"echo "$FOOBAR""#, Symbol::String("\n".to_string()));
+    assert_expr(
+        "echo '# $FOOBAR'",
+        Symbol::String("# $FOOBAR\n".to_string()),
+    );
+    assert_expr(
+        "echo 'foo'; echo 'bar'",
+        Symbol::String("foo\nbar\n".to_string()),
+    );
 }

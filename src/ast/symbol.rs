@@ -9,13 +9,15 @@ pub enum Symbol {
     Variable(String),
 }
 
-impl ToString for Symbol {
-    fn to_string(&self) -> String {
-        match self {
+impl std::fmt::Display for Symbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
             Symbol::Number(n) => n.to_string(),
             Symbol::Boolean(b) => b.to_string(),
             Symbol::Function(f) => f.name.to_string(),
             Symbol::String(s) | Symbol::Variable(s) => s.to_string(),
-        }
+        };
+
+        write!(f, "{}", s)
     }
 }

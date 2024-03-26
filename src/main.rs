@@ -3,9 +3,17 @@ use orca::parser::Parser;
 use std::env;
 use std::fs;
 use std::io::{self, Write};
+use std::process;
 
 fn parse_file(filename: &str) {
-    let src = fs::read_to_string(filename).unwrap();
+    let src = match fs::read_to_string(filename) {
+        Ok(s) => s,
+        Err(err) => {
+            eprintln!("failed to read file: {}", err.to_string());
+            process::exit(1);
+        }
+    };
+
     let ast = Parser::new(&src).parse();
     let mut evaluator = ASTEvaluator::new();
     evaluator.eval(ast);

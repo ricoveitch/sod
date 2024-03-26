@@ -1,4 +1,4 @@
-use crate::lexer::TokenType;
+use crate::lexer::token::TokenType;
 
 #[derive(Debug, Clone)]
 pub enum ASTNode {
