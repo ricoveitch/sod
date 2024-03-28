@@ -84,6 +84,7 @@ mod tests {
         x",
             Symbol::Number(2.0),
         );
+        assert_expr("1 || echo 'foo'", Symbol::Number(1.0));
     }
 
     #[test]
@@ -99,5 +100,11 @@ mod tests {
                     x"#,
             Symbol::String("foo".to_string()),
         );
+        assert_expr(
+            r#"x = "foo"
+x + "bar"
+"#,
+            Symbol::String("foobar".to_string()),
+        )
     }
 }

@@ -21,4 +21,5 @@ output"#,
         "echo 'foo'; echo 'bar'",
         Symbol::String("foo\nbar\n".to_string()),
     );
+    assert_expr("1 > 0 && echo 'foo'", Symbol::String("foo\n".to_string()));
 }

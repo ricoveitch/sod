@@ -3,9 +3,8 @@ use super::ast::{
     VariableExpression,
 };
 use super::scope::ScopeKind;
-use super::symbol::Symbol;
+use super::symbol::{self, Symbol};
 use super::symbol_table::SymbolTable;
-use super::util;
 use crate::common::bash;
 use crate::lexer::token::TokenType;
 
@@ -96,11 +95,7 @@ impl ASTEvaluator {
 
     fn eval_if_statement(&mut self, if_statement: IfStatement) {
         let passed = match self.eval_node(*if_statement.condition) {
-            Some(sym) => match sym {
-                Symbol::Number(num) => num != 0.0,
-                Symbol::Boolean(b) => b,
-                _ => false,
-            },
+            Some(sym) => sym.is_truthy(),
             None => false,
         };
 
@@ -182,77 +177,23 @@ impl ASTEvaluator {
             None => return None,
         };
 
+        if be.operator == TokenType::And && !left_symbol.is_truthy() {
+            return None;
+        }
+
+        if be.operator == TokenType::Or && left_symbol.is_truthy() {
+            return Some(left_symbol);
+        }
+
         let right_symbol = match self.eval_node(*be.right) {
             Some(s) => s,
             None => return None,
         };
 
-        let result_symbol = match &be.operator {
-            op if util::is_comparative_operator(op) => {
-                self.compare(&left_symbol, op, &right_symbol)
-            }
-            _ => self.eval_math_expression(&left_symbol, &be.operator, &right_symbol),
-        };
-
-        Some(result_symbol)
-    }
-
-    fn eval_math_expression(&self, left: &Symbol, operator: &TokenType, right: &Symbol) -> Symbol {
-        let (l, r) = match (left, right) {
-            (Symbol::Number(ln), Symbol::Number(rn)) => (ln, rn),
-            _ => panic!(
-                "{:?} {} {:?}: can only perform mathematical expressions on numbers",
-                left, operator, right
-            ),
-        };
-
-        let res = match operator {
-            TokenType::Plus => l + r,
-            TokenType::Minus => l - r,
-            TokenType::Asterisk => l * r,
-            TokenType::ForwardSlash => l / r,
-            TokenType::Carat => l.powf(*r),
-            _ => panic!("invalid operator {}", operator),
-        };
-
-        Symbol::Number(res)
-    }
-
-    fn compare(&self, left: &Symbol, operator: &TokenType, right: &Symbol) -> Symbol {
-        match (left, right) {
-            // TODO: change this to allow true && echo 'foo'
-            (Symbol::Number(ln), Symbol::Number(rn)) => self.compare_number(*ln, operator, *rn),
-            (Symbol::Boolean(lb), Symbol::Boolean(rb)) => self.compare_bool(*lb, operator, *rb),
-            _ => panic!("type mismatch: {} {} {}", left, operator.to_string(), right),
-        }
-    }
-
-    fn compare_bool(&self, left: bool, operator: &TokenType, right: bool) -> Symbol {
-        let bool_result = match operator {
-            TokenType::DoubleEquals => left == right,
-            TokenType::NotEquals => left != right,
-            TokenType::And => left && right,
-            TokenType::Or => left || right,
-            _ => panic!(
-                "{:?} {} {:?}: unable to compare booleans",
-                left, operator, right
-            ),
-        };
-
-        Symbol::Boolean(bool_result)
-    }
-
-    fn compare_number(&self, left: f64, operator: &TokenType, right: f64) -> Symbol {
-        let res = match operator {
-            TokenType::DoubleEquals => left == right,
-            TokenType::NotEquals => left != right,
-            TokenType::GreaterThan => left > right,
-            TokenType::LessThan => left < right,
-            TokenType::Ge => left >= right,
-            TokenType::Le => left <= right,
-            _ => panic!("expected a comparison"),
-        };
-
-        Symbol::Boolean(res)
+        Some(symbol::eval_binary_expression(
+            &left_symbol,
+            &be.operator,
+            &right_symbol,
+        ))
     }
 }
