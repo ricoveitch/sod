@@ -107,4 +107,12 @@ x + "bar"
             Symbol::String("foobar".to_string()),
         )
     }
+
+    #[test]
+    fn lists() {
+        assert_expr("x = [1, 2]\nx[1]", Symbol::Number(2.0));
+        assert_expr("x = []\nx.push(5)\nx.push(6)\nx.pop()", Symbol::Number(6.0));
+        assert_expr("x = [5]\nx[0] = 1\nx[0]", Symbol::Number(1.0));
+        assert_expr("x = [5]\nx_0 = x[0]\nx_0 = 1\nx[0]", Symbol::Number(5.0));
+    }
 }

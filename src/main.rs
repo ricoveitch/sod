@@ -29,10 +29,9 @@ fn interpret() {
         io::stdin().read_line(&mut buffer).unwrap();
 
         let program = Parser::new(&buffer).parse();
-        println!("ast:{:?}", program);
         for option in evaluator.eval(program) {
             if let Some(value) = option {
-                println!("{:?}", value);
+                println!("{}", value);
             }
         }
     }

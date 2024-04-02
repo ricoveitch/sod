@@ -69,7 +69,7 @@ impl Lexer {
     }
 
     fn read_identifier(&self) -> (TokenType, usize) {
-        let (bytes, bytes_read) = self.read_while(|b| b.is_ascii_alphabetic(), 0);
+        let (bytes, bytes_read) = self.read_while(|b| b.is_ascii_alphanumeric() || *b == b'_', 0);
 
         (
             TokenType::Identifier(utils::bytes_to_string(bytes)),
@@ -188,6 +188,8 @@ impl Lexer {
             b'^' => (TokenType::Carat, 1),
             b'+' => (TokenType::Plus, 1),
             b'~' => (TokenType::Tilde, 1),
+            b'[' => (TokenType::OpenSqBracket, 1),
+            b']' => (TokenType::CloseSqBracket, 1),
             b'|' => self.read_pipe(),
             b'&' => self.read_and(),
             b'=' => self.read_equals(),

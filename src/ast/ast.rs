@@ -4,6 +4,7 @@ use crate::lexer::token::TokenType;
 pub enum ASTNode {
     Program(Box<Vec<ASTNode>>),
 
+    MemberExpression(MemberExpression),
     FunctionExpression(FunctionExpression),
     FunctionCall(FunctionCall),
 
@@ -15,12 +16,25 @@ pub enum ASTNode {
     IfStatement(IfStatement),
     BlockStatement(BlockStatement),
 
-    Variable(String),
     Number(f64),
     Boolean(bool),
     String(String),
+    Identifier(String),
+    List(Box<Vec<ASTNode>>),
 
     Command(Box<Vec<ASTNode>>),
+}
+
+#[derive(Debug, Clone)]
+pub enum MemberExpressionKind {
+    Index(ASTNode),
+    Call(FunctionCall),
+}
+
+#[derive(Debug, Clone)]
+pub struct MemberExpression {
+    pub identifier: String,
+    pub kind: Box<MemberExpressionKind>,
 }
 
 #[derive(Debug, Clone)]
@@ -32,7 +46,7 @@ pub struct BinaryExpression {
 
 #[derive(Debug, Clone)]
 pub struct VariableExpression {
-    pub name: String,
+    pub lhs: Box<ASTNode>,
     pub rhs: Box<ASTNode>,
 }
 

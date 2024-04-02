@@ -8,11 +8,55 @@ pub enum Symbol {
     String(String),
     Function(FunctionExpression),
     Variable(String),
+    List(List),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct List {
+    pub items: Vec<Symbol>,
+}
+
+impl List {
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn pop(&mut self) -> Option<Symbol> {
+        self.items.pop()
+    }
+
+    pub fn push(&mut self, item: Symbol) -> usize {
+        self.items.push(item);
+        self.len()
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut Symbol> {
+        self.items.get_mut(index)
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Symbol> {
+        self.items.get(index)
+    }
+
+    pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Option<Symbol> {
+        match fname {
+            "len" => Some(Symbol::Number(self.len() as f64)),
+            "pop" => self.pop(),
+            "push" => {
+                if args.len() != 1 {
+                    panic!("incorrect number of arguments to push")
+                }
+                let symbol = args.get(0).unwrap().to_owned();
+                return Some(Symbol::Number(self.push(symbol) as f64));
+            }
+            _ => panic!("list has no member '{}'", fname),
+        }
+    }
 }
 
 fn compare_literal<T>(left: T, operator: &TokenType, right: T) -> bool
 where
-    T: std::cmp::PartialEq + std::cmp::PartialOrd + std::fmt::Debug,
+    T: std::cmp::PartialEq + std::cmp::PartialOrd + std::fmt::Display,
 {
     match operator {
         TokenType::GreaterThan => left > right,
@@ -20,7 +64,7 @@ where
         TokenType::Ge => left >= right,
         TokenType::Le => left <= right,
         _ => panic!(
-            "{:?} {} {:?}: unable to compare booleans",
+            "{} {} {}: unable to compare booleans",
             left, operator, right
         ),
     }
@@ -112,8 +156,12 @@ impl std::fmt::Display for Symbol {
         let s = match self {
             Symbol::Number(n) => n.to_string(),
             Symbol::Boolean(b) => b.to_string(),
-            Symbol::Function(f) => f.name.to_string(),
+            Symbol::Function(f) => format!("func {}", f.name),
             Symbol::String(s) | Symbol::Variable(s) => s.to_string(),
+            Symbol::List(list) => {
+                let items: Vec<String> = list.items.iter().map(|f| f.to_string()).collect();
+                format!("{:?}", items)
+            }
         };
 
         write!(f, "{}", s)
@@ -127,6 +175,7 @@ impl Symbol {
             Symbol::Boolean(b) => *b,
             Symbol::Function(_) => true,
             Symbol::String(s) | Symbol::Variable(s) => s.len() > 0,
+            Symbol::List(_) => true,
         }
     }
 }

@@ -46,9 +46,9 @@ impl SymbolTable {
         None
     }
 
-    fn get_mut(&mut self, symbol_name: &str) -> Option<&mut Symbol> {
+    pub fn get_mut(&mut self, symbol_name: &str) -> Option<&mut Symbol> {
         let scope_id = match self.find(symbol_name) {
-            Some((s, _)) => s,
+            Some((id, _)) => id,
             None => return None,
         };
 

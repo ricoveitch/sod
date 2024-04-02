@@ -4,11 +4,10 @@ use std::collections::HashSet;
 use crate::{
     ast::ast::{
         ASTNode, BinaryExpression, BlockStatement, FunctionCall, FunctionExpression, IfStatement,
-        VariableExpression,
+        MemberExpression, MemberExpressionKind, VariableExpression,
     },
     common::bash,
-    lexer::lexer,
-    lexer::token::TokenType,
+    lexer::{lexer, token::TokenType},
 };
 
 pub struct Parser {
@@ -99,12 +98,12 @@ impl Parser {
 
     fn eat(&mut self, expected_token: &TokenType) -> TokenType {
         if self.curr_token == TokenType::EOF {
-            panic!("eof")
+            panic!("EOF")
         }
 
         if expected_token != &self.curr_token {
             panic!(
-                "unexpected token {}, expected {}",
+                "unexpected token '{}', expected '{}'",
                 self.curr_token, expected_token
             )
         }
@@ -167,15 +166,15 @@ impl Parser {
 
     /**
      * statement
-     *   = variable_expression
+     *   = variable_statement
      *   / function_expression
      *   / if_statement
      *   / expression
      */
     fn statement(&mut self) -> ASTNode {
-        if self.lookahead(1) == TokenType::Equals {
-            return self.variable_expression();
-        }
+        // if self.lookahead(1) == TokenType::Equals {
+        //     return self.variable_statement();
+        // }
 
         if let TokenType::Identifier(ident) = &self.curr_token {
             match ident.as_str() {
@@ -276,16 +275,15 @@ impl Parser {
     }
 
     /**
-     * variable_expression
-     *   = identifier "=" expression
+     * variable_statement
+     *   = expression "=" expression
      */
-    fn variable_expression(&mut self) -> ASTNode {
-        let name = self.eat_identifier();
+    fn variable_statement(&mut self, lhs: ASTNode) -> ASTNode {
         self.eat(&TokenType::Equals);
         let expression = self.expression(0);
 
         ASTNode::VariableExpression(VariableExpression {
-            name,
+            lhs: Box::new(lhs),
             rhs: Box::new(expression),
         })
     }
@@ -337,28 +335,99 @@ impl Parser {
      *   / return_expression
      *   / function_call
      *   / command
-     *   / LITERAL
+     *   / symbol
      */
     fn prefix(&mut self) -> ASTNode {
         match &self.curr_token {
             TokenType::OpenParen => self.parenthesized_expression(),
             TokenType::Minus => self.unary_expression(),
-            TokenType::Identifier(ident) => self.identifier(ident.to_owned()),
+            TokenType::Identifier(ident) => self.parse_identifier(ident.to_owned()),
+            TokenType::OpenSqBracket => self.list_literal(),
             _ => self.eat_literal(),
         }
     }
 
-    fn identifier(&mut self, ident: String) -> ASTNode {
-        if self.lookahead(1) == TokenType::OpenParen {
-            return self.function_call();
+    /**
+     * list
+     *   = [(expression),*]
+     */
+    fn list_literal(&mut self) -> ASTNode {
+        self.eat(&TokenType::OpenSqBracket);
+
+        let mut items = vec![];
+        if self.curr_token == TokenType::CloseSqBracket {
+            self.eat(&TokenType::CloseSqBracket);
+            return ASTNode::List(Box::new(items));
         }
+
+        loop {
+            items.push(self.expression(0));
+            if self.curr_token == TokenType::CloseSqBracket {
+                self.eat(&TokenType::CloseSqBracket);
+                break;
+            }
+            self.eat(&TokenType::Comma);
+        }
+
+        ASTNode::List(Box::new(items))
+    }
+
+    fn parse_identifier(&mut self, ident: String) -> ASTNode {
+        match self.lookahead(1) {
+            TokenType::OpenParen => return ASTNode::FunctionCall(self.function_call()),
+            TokenType::OpenSqBracket => return self.member_index_expression(),
+            TokenType::Dot => return self.member_call_expression(),
+            _ => (),
+        };
 
         match ident.as_str() {
             "return" => self.return_expression(),
             "true" => self.eat_bool(true),
             "false" => self.eat_bool(false),
             s if self.commands.contains(s) => self.command(ident),
-            _ => ASTNode::Variable(self.eat_identifier()),
+            _ => {
+                let node = ASTNode::Identifier(self.eat_identifier());
+                if self.curr_token == TokenType::Equals {
+                    self.variable_statement(node)
+                } else {
+                    node
+                }
+            }
+        }
+    }
+
+    /**
+     * identifier "." function_call
+     */
+    fn member_call_expression(&mut self) -> ASTNode {
+        let ident = self.eat_identifier();
+        self.eat(&TokenType::Dot);
+        let call = self.function_call();
+
+        ASTNode::MemberExpression(MemberExpression {
+            identifier: ident,
+            kind: Box::new(MemberExpressionKind::Call(call)),
+        })
+    }
+
+    /**
+     * identifier "[" (expression) "]"
+     */
+    fn member_index_expression(&mut self) -> ASTNode {
+        let ident = self.eat_identifier();
+        self.eat(&TokenType::OpenSqBracket);
+        let expression = self.expression(0);
+        self.eat(&TokenType::CloseSqBracket);
+
+        let member_expression = ASTNode::MemberExpression(MemberExpression {
+            identifier: ident,
+            kind: Box::new(MemberExpressionKind::Index(expression)),
+        });
+
+        if self.curr_token == TokenType::Equals {
+            self.variable_statement(member_expression)
+        } else {
+            member_expression
         }
     }
 
@@ -372,7 +441,7 @@ impl Parser {
 
         while !self.curr_token.is_end_line() {
             let node = match &self.curr_token {
-                TokenType::EscapedIdentifier(ident) => ASTNode::Variable(ident.to_string()),
+                TokenType::EscapedIdentifier(ident) => ASTNode::Identifier(ident.to_string()),
                 t => ASTNode::String(t.to_string()),
             };
 
@@ -429,12 +498,13 @@ impl Parser {
      * function_call
      *    = identifier "(" function_call_args ")"
      */
-    fn function_call(&mut self) -> ASTNode {
+    fn function_call(&mut self) -> FunctionCall {
         let fname = self.eat_identifier();
         self.eat(&TokenType::OpenParen);
         let args = self.function_call_args();
         self.eat(&TokenType::CloseParen);
-        ASTNode::FunctionCall(FunctionCall { name: fname, args })
+
+        FunctionCall { name: fname, args }
     }
 
     /**
@@ -449,7 +519,7 @@ impl Parser {
         let mut args = vec![];
         loop {
             let node = match &self.curr_token {
-                TokenType::Identifier(_) => ASTNode::Variable(self.eat_identifier()),
+                TokenType::Identifier(_) => ASTNode::Identifier(self.eat_identifier()),
                 _ => self.eat_literal(),
             };
             args.push(node);
