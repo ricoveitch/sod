@@ -14,4 +14,15 @@ pub mod utils {
         let symbol = evaluation.last().unwrap().as_ref().unwrap();
         assert_eq!(&expected, symbol);
     }
+
+    #[allow(dead_code)]
+    pub fn assert_exprs(exprs: Vec<&str>, expected: Vec<Symbol>) {
+        let mut evaluator = ASTEvaluator::new();
+        for (expr, expected) in exprs.iter().zip(expected.iter()) {
+            let program = Parser::new(expr).parse();
+            let evaluation = evaluator.eval(program);
+            let symbol = evaluation.last().unwrap().as_ref().unwrap();
+            assert_eq!(expected, symbol);
+        }
+    }
 }

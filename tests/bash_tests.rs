@@ -1,5 +1,5 @@
 use common::utils::assert_expr;
-use orca::ast::symbol::Symbol;
+use orca::new_string_symbol;
 
 mod common;
 
@@ -9,17 +9,20 @@ fn scripts() {
         r#"path = "./data/aviation/bland/"
 output=ls $path | grep '..tmp'
 output"#,
-        Symbol::String("gear.tmp\n".to_string()),
+        new_string_symbol!("gear.tmp\n".to_string()),
     );
 
-    assert_expr(r#"echo "$FOOBAR""#, Symbol::String("\n".to_string()));
+    assert_expr(r#"echo "$FOOBAR""#, new_string_symbol!("\n".to_string()));
     assert_expr(
         "echo '# $FOOBAR'",
-        Symbol::String("# $FOOBAR\n".to_string()),
+        new_string_symbol!("# $FOOBAR\n".to_string()),
     );
     assert_expr(
         "echo 'foo'; echo 'bar'",
-        Symbol::String("foo\nbar\n".to_string()),
+        new_string_symbol!("foo\nbar\n".to_string()),
     );
-    assert_expr("1 > 0 && echo 'foo'", Symbol::String("foo\n".to_string()));
+    assert_expr(
+        "1 > 0 && echo 'foo'",
+        new_string_symbol!("foo\n".to_string()),
+    );
 }

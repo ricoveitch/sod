@@ -7,6 +7,7 @@ use super::symbol::{self, List, Symbol};
 use super::symbol_table::SymbolTable;
 use crate::common::bash;
 use crate::lexer::token::TokenType;
+use crate::new_string_symbol;
 
 pub struct ASTEvaluator {
     symbol_table: SymbolTable,
@@ -55,7 +56,7 @@ impl ASTEvaluator {
             ASTNode::ReturnExpression(expr) => self.eval_node(*expr),
             ASTNode::Number(value) => Some(Symbol::Number(value)),
             ASTNode::Boolean(value) => Some(Symbol::Boolean(value)),
-            ASTNode::String(value) => Some(Symbol::String(value)),
+            ASTNode::String(value) => Some(new_string_symbol!(value)),
             ASTNode::List(nodes) => Some(self.eval_list(*nodes)),
             ASTNode::Command(cmd) => Some(self.eval_command(*cmd)),
             ASTNode::Identifier(ident) => Some(self.get_symbol(&ident).clone()),
@@ -84,7 +85,7 @@ impl ASTEvaluator {
     fn eval_member_expression(&mut self, me: MemberExpression) -> Option<Symbol> {
         match *me.kind {
             MemberExpressionKind::Index(expr) => {
-                Some(self.visit_member_index(me.identifier.as_str(), expr))
+                Some(self.eval_member_index(me.identifier.as_str(), expr))
             }
             MemberExpressionKind::Call(call) => self.eval_symbol_call(me.identifier.as_str(), call),
         }
@@ -104,10 +105,13 @@ impl ASTEvaluator {
 
     fn eval_symbol_call(&mut self, indent: &str, call: FunctionCall) -> Option<Symbol> {
         let args = self.visit_function_args(call.args);
+        let call = call.name.as_str();
+        let symbol = self.get_symbol_mut(&indent);
 
-        match self.get_symbol_mut(&indent) {
-            Symbol::List(list) => list.call(call.name.as_str(), args),
-            _ => panic!(""),
+        match symbol {
+            Symbol::List(list) => list.call(call, args),
+            Symbol::String(ss) => ss.call(call, args),
+            _ => panic!("{} has no member {}", symbol, call),
         }
     }
 
@@ -123,31 +127,22 @@ impl ASTEvaluator {
         }
     }
 
-    fn visit_member_index(&mut self, member: &str, expression: ASTNode) -> Symbol {
+    fn eval_member_index(&mut self, member: &str, expression: ASTNode) -> Symbol {
         let index = self.visit_index_expression(expression);
 
-        let result = match self.get_symbol(&member) {
-            Symbol::List(list) => list.get(index),
-            _ => panic!("object is not indexable"),
-        };
-
-        match result {
-            Some(res) => res.clone(),
-            None => panic!("index out of range"),
+        match self.get_symbol(&member) {
+            Symbol::List(list) => list.get(index).clone(),
+            Symbol::String(string) => Symbol::String(string.get(index)),
+            _ => panic!("object {} is not indexable", member),
         }
     }
 
-    fn visit_member_index_mut(&mut self, member: &str, expression: ASTNode) -> &mut Symbol {
+    fn eval_member_index_mut(&mut self, member: &str, expression: ASTNode) -> &mut Symbol {
         let index = self.visit_index_expression(expression);
 
-        let result = match self.get_symbol_mut(&member) {
+        match self.get_symbol_mut(&member) {
             Symbol::List(list) => list.get_mut(index),
-            _ => panic!("object is not indexable"),
-        };
-
-        match result {
-            Some(res) => res,
-            None => panic!("index out of range"),
+            _ => panic!("object {} is not indexable", member),
         }
     }
 
@@ -172,7 +167,7 @@ impl ASTEvaluator {
         }
 
         let output = bash::run_cmd(&cmd_string);
-        Symbol::String(output)
+        new_string_symbol!(output)
     }
 
     fn eval_block_statement(&mut self, block_statement: BlockStatement) -> Option<Symbol> {
@@ -253,7 +248,7 @@ impl ASTEvaluator {
             ASTNode::Identifier(ident) => self.symbol_table.insert(&ident, rhs),
             ASTNode::MemberExpression(me) => match *me.kind {
                 MemberExpressionKind::Index(expr) => {
-                    let lhs_symbol = self.visit_member_index_mut(me.identifier.as_str(), expr);
+                    let lhs_symbol = self.eval_member_index_mut(me.identifier.as_str(), expr);
                     *lhs_symbol = rhs;
                 }
                 _ => unimplemented!("member expression must use an index"),

@@ -5,10 +5,120 @@ use crate::lexer::token::TokenType;
 pub enum Symbol {
     Number(f64),
     Boolean(bool),
-    String(String),
-    Function(FunctionExpression),
-    Variable(String),
+    String(StringSymbol),
     List(List),
+    Function(FunctionExpression),
+}
+
+#[macro_export]
+macro_rules! new_string_symbol {
+    ($v:expr) => {
+        $crate::ast::symbol::Symbol::String($crate::ast::symbol::StringSymbol::new($v))
+    };
+}
+
+#[derive(Debug, Clone)]
+pub struct StringSymbol {
+    value: String,
+}
+
+impl StringSymbol {
+    pub fn new(s: String) -> Self {
+        Self { value: s }
+    }
+
+    pub fn get(&self, index: usize) -> Self {
+        match self.value.chars().nth(index) {
+            Some(c) => StringSymbol::new(c.to_string()),
+            None => panic!("string index out of range"),
+        }
+    }
+
+    pub fn len(&self) -> Symbol {
+        Symbol::Number(self.value.len() as f64)
+    }
+
+    pub fn insert(&mut self, args: Vec<Symbol>) {
+        if args.len() != 2 {
+            panic!("expected 2 arguments to insert, found {}", args.len())
+        }
+
+        let index = match args.get(0).unwrap().to_owned() {
+            Symbol::Number(index) => index as usize,
+            _ => panic!("string indexes must be of type number"),
+        };
+
+        if index > self.value.len() {
+            panic!("string insert index out of range");
+        }
+
+        let string = match args.get(1).unwrap() {
+            Symbol::String(s) => &s.value,
+            _ => panic!("can only insert string into a string"),
+        };
+
+        self.value.insert_str(index, string.as_str());
+    }
+
+    pub fn remove(&mut self, args: Vec<Symbol>) -> Symbol {
+        if args.len() != 1 {
+            panic!("incorrect number of arguments to remove")
+        }
+
+        let index = match args.get(0).unwrap().to_owned() {
+            Symbol::Number(index) => index as usize,
+            _ => panic!("string indexes must be of type number"),
+        };
+
+        if index > self.value.len() {
+            panic!("string remove index out of range");
+        }
+
+        let removed = self.value.remove(index);
+        new_string_symbol!(removed.to_string())
+    }
+
+    pub fn pop(&mut self) -> Option<Symbol> {
+        if let Some(popped) = self.value.pop() {
+            return Some(new_string_symbol!(popped.to_string()));
+        }
+
+        return None;
+    }
+
+    pub fn push(&mut self, args: Vec<Symbol>) -> Symbol {
+        if args.len() != 1 {
+            panic!("incorrect number of arguments to push")
+        }
+
+        let symbol = match args.get(0).unwrap() {
+            Symbol::String(ss) => &ss.value,
+            _ => panic!("can only add a string to a string"),
+        };
+
+        self.value.push_str(symbol);
+        self.len()
+    }
+
+    pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Option<Symbol> {
+        match fname {
+            "insert" => {
+                self.insert(args);
+                None
+            }
+            "remove" => Some(self.remove(args)),
+            "pop" => self.pop(),
+            "len" => Some(self.len()),
+            "push" => Some(self.push(args)),
+            _ => panic!("string has no member '{}'", fname),
+        }
+    }
+}
+
+impl PartialEq for StringSymbol {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -17,44 +127,89 @@ pub struct List {
 }
 
 impl List {
-    pub fn len(&self) -> usize {
-        self.items.len()
+    pub fn len(&self) -> Symbol {
+        Symbol::Number(self.items.len() as f64)
     }
 
     pub fn pop(&mut self) -> Option<Symbol> {
         self.items.pop()
     }
 
-    pub fn push(&mut self, item: Symbol) -> usize {
-        self.items.push(item);
+    pub fn push(&mut self, args: Vec<Symbol>) -> Symbol {
+        if args.len() != 1 {
+            panic!("incorrect number of arguments to push")
+        }
+
+        let symbol = args.get(0).unwrap().to_owned();
+        self.items.push(symbol);
         self.len()
     }
 
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Symbol> {
-        self.items.get_mut(index)
+    pub fn get_mut(&mut self, index: usize) -> &mut Symbol {
+        match self.items.get_mut(index) {
+            Some(s) => s,
+            None => panic!("list index out of range"),
+        }
     }
 
-    pub fn get(&self, index: usize) -> Option<&Symbol> {
-        self.items.get(index)
+    pub fn get(&self, index: usize) -> &Symbol {
+        match self.items.get(index) {
+            Some(s) => s,
+            None => panic!("list index out of range"),
+        }
+    }
+
+    pub fn remove(&mut self, args: Vec<Symbol>) -> Symbol {
+        if args.len() != 1 {
+            panic!("incorrect number of arguments to remove")
+        }
+
+        let index = match args.get(0).unwrap().to_owned() {
+            Symbol::Number(index) => index as usize,
+            _ => panic!("list indexes must be of type number"),
+        };
+
+        if index > self.items.len() {
+            panic!("list remove index out of range");
+        }
+
+        self.items.remove(index)
+    }
+
+    pub fn insert(&mut self, args: Vec<Symbol>) {
+        if args.len() != 2 {
+            panic!("expected 2 arguments to insert, found {}", args.len())
+        }
+
+        let index = match args.get(0).unwrap().to_owned() {
+            Symbol::Number(index) => index as usize,
+            _ => panic!("list indexes must be of type number"),
+        };
+
+        if index > self.items.len() {
+            panic!("list insert index out of range");
+        }
+
+        let symbol = args.get(1).unwrap().to_owned();
+        self.items.insert(index, symbol);
     }
 
     pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Option<Symbol> {
         match fname {
-            "len" => Some(Symbol::Number(self.len() as f64)),
+            "len" => Some(self.len()),
             "pop" => self.pop(),
-            "push" => {
-                if args.len() != 1 {
-                    panic!("incorrect number of arguments to push")
-                }
-                let symbol = args.get(0).unwrap().to_owned();
-                return Some(Symbol::Number(self.push(symbol) as f64));
+            "push" => Some(self.push(args)),
+            "remove" => Some(self.remove(args)),
+            "insert" => {
+                self.insert(args);
+                None
             }
             _ => panic!("list has no member '{}'", fname),
         }
     }
 }
 
-fn compare_literal<T>(left: T, operator: &TokenType, right: T) -> bool
+fn compare_literal<T>(left: &T, operator: &TokenType, right: &T) -> bool
 where
     T: std::cmp::PartialEq + std::cmp::PartialOrd + std::fmt::Display,
 {
@@ -74,7 +229,7 @@ fn compare_relational(left: &Symbol, op: &TokenType, right: &Symbol) -> bool {
     match (left, right) {
         (Symbol::Number(lv), Symbol::Number(rv)) => compare_literal(lv, op, rv),
         (Symbol::Boolean(lv), Symbol::Boolean(rv)) => compare_literal(lv, op, rv),
-        (Symbol::String(lv), Symbol::String(rv)) => compare_literal(lv, op, rv),
+        (Symbol::String(lv), Symbol::String(rv)) => compare_literal(&lv.value, op, &rv.value),
         _ => panic!("type mismatch: {} > {}", left, right),
     }
 }
@@ -112,7 +267,10 @@ impl std::ops::Add for &Symbol {
     fn add(self, rhs: Self) -> Symbol {
         match (self, rhs) {
             (Symbol::Number(lv), Symbol::Number(rv)) => Symbol::Number(lv + rv),
-            (Symbol::String(lv), Symbol::String(rv)) => Symbol::String(format!("{}{}", lv, rv)),
+            (Symbol::String(lv), Symbol::String(rv)) => {
+                let value = format!("{}{}", lv.value, rv.value);
+                new_string_symbol!(value)
+            }
             _ => panic!("unsupported operand type for {} + {}", self, rhs),
         }
     }
@@ -157,7 +315,7 @@ impl std::fmt::Display for Symbol {
             Symbol::Number(n) => n.to_string(),
             Symbol::Boolean(b) => b.to_string(),
             Symbol::Function(f) => format!("func {}", f.name),
-            Symbol::String(s) | Symbol::Variable(s) => s.to_string(),
+            Symbol::String(s) => s.value.to_string(),
             Symbol::List(list) => {
                 let items: Vec<String> = list.items.iter().map(|f| f.to_string()).collect();
                 format!("{:?}", items)
@@ -174,7 +332,7 @@ impl Symbol {
             Symbol::Number(n) => *n != 0.0,
             Symbol::Boolean(b) => *b,
             Symbol::Function(_) => true,
-            Symbol::String(s) | Symbol::Variable(s) => s.len() > 0,
+            Symbol::String(s) => s.value.len() > 0,
             Symbol::List(_) => true,
         }
     }
