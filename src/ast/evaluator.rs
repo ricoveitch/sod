@@ -2,12 +2,12 @@ use super::ast::{
     ASTNode, BinaryExpression, BlockStatement, FunctionCall, FunctionExpression, IfStatement,
     MemberExpression, MemberExpressionKind, VariableExpression,
 };
-use super::scope::ScopeKind;
-use super::symbol::{self, List, Symbol};
-use super::symbol_table::SymbolTable;
 use crate::common::bash;
 use crate::lexer::token::TokenType;
 use crate::new_string_symbol;
+use crate::symbol::scope::ScopeKind;
+use crate::symbol::symbol::{self, List, Symbol};
+use crate::symbol::table::SymbolTable;
 
 pub struct ASTEvaluator {
     symbol_table: SymbolTable,

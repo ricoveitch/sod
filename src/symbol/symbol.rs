@@ -1,4 +1,4 @@
-use super::ast::FunctionExpression;
+use crate::ast::ast::FunctionExpression;
 use crate::lexer::token::TokenType;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -13,7 +13,7 @@ pub enum Symbol {
 #[macro_export]
 macro_rules! new_string_symbol {
     ($v:expr) => {
-        $crate::ast::symbol::Symbol::String($crate::ast::symbol::StringSymbol::new($v))
+        $crate::symbol::symbol::Symbol::String($crate::symbol::symbol::StringSymbol::new($v))
     };
 }
 
