@@ -102,10 +102,7 @@ impl Parser {
         }
 
         if expected_token != &self.curr_token {
-            panic!(
-                "unexpected token '{}', expected '{}'",
-                self.curr_token, expected_token
-            )
+            panic!("unexpected token '{}'", self.curr_token)
         }
 
         let previous_token = self.curr_token.clone();
@@ -172,10 +169,6 @@ impl Parser {
      *   / expression
      */
     fn statement(&mut self) -> ASTNode {
-        // if self.lookahead(1) == TokenType::Equals {
-        //     return self.variable_statement();
-        // }
-
         if let TokenType::Identifier(ident) = &self.curr_token {
             match ident.as_str() {
                 "func" => return self.function_expression(),
@@ -384,6 +377,10 @@ impl Parser {
             "return" => self.return_expression(),
             "true" => self.eat_bool(true),
             "false" => self.eat_bool(false),
+            "none" => {
+                self.eat(&TokenType::Identifier(ident));
+                ASTNode::None
+            }
             s if self.commands.contains(s) => self.command(ident),
             _ => {
                 let node = ASTNode::Identifier(self.eat_identifier());

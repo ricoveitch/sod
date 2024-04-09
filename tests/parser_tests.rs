@@ -81,6 +81,7 @@ fn conditionals() {
         Symbol::Number(2.0),
     );
     assert_expr("1 || echo 'foo'", Symbol::Number(1.0));
+    assert_expr("none && 1", Symbol::None);
 }
 
 #[test]

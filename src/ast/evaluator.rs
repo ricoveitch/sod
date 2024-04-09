@@ -54,10 +54,13 @@ impl ASTEvaluator {
             }
             ASTNode::BlockStatement(bs) => self.eval_block_statement(bs),
             ASTNode::ReturnExpression(expr) => self.eval_node(*expr),
+
             ASTNode::Number(value) => Some(Symbol::Number(value)),
             ASTNode::Boolean(value) => Some(Symbol::Boolean(value)),
             ASTNode::String(value) => Some(new_string_symbol!(value)),
             ASTNode::List(nodes) => Some(self.eval_list(*nodes)),
+            ASTNode::None => Some(Symbol::None),
+
             ASTNode::Command(cmd) => Some(self.eval_command(*cmd)),
             ASTNode::Identifier(ident) => Some(self.get_symbol(&ident).clone()),
             ASTNode::Program(_) => None,
@@ -68,7 +71,7 @@ impl ASTEvaluator {
         match self.symbol_table.get(&name) {
             Some(symbol) => symbol,
             None => {
-                panic!("undeclared variable '{}'", name);
+                panic!("'{}' is not defined", name);
             }
         }
     }
@@ -77,7 +80,7 @@ impl ASTEvaluator {
         match self.symbol_table.get_mut(&name) {
             Some(symbol) => symbol,
             None => {
-                panic!("undeclared variable '{}'", name);
+                panic!("'{}' is not defined", name);
             }
         }
     }
@@ -276,7 +279,7 @@ impl ASTEvaluator {
         };
 
         if be.operator == TokenType::And && !left_symbol.is_truthy() {
-            return None;
+            return Some(left_symbol);
         }
 
         if be.operator == TokenType::Or && left_symbol.is_truthy() {

@@ -20,6 +20,7 @@ pub enum ASTNode {
     Boolean(bool),
     String(String),
     Identifier(String),
+    None,
     List(Box<Vec<ASTNode>>),
 
     Command(Box<Vec<ASTNode>>),

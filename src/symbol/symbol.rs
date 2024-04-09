@@ -7,6 +7,7 @@ pub enum Symbol {
     Boolean(bool),
     String(StringSymbol),
     List(List),
+    None,
     Function(FunctionExpression),
 }
 
@@ -316,6 +317,7 @@ impl std::fmt::Display for Symbol {
             Symbol::Boolean(b) => b.to_string(),
             Symbol::Function(f) => format!("func {}", f.name),
             Symbol::String(s) => s.value.to_string(),
+            Symbol::None => "none".to_string(),
             Symbol::List(list) => {
                 let items: Vec<String> = list.items.iter().map(|f| f.to_string()).collect();
                 format!("{:?}", items)
@@ -334,6 +336,7 @@ impl Symbol {
             Symbol::Function(_) => true,
             Symbol::String(s) => s.value.len() > 0,
             Symbol::List(_) => true,
+            Symbol::None => false,
         }
     }
 }
