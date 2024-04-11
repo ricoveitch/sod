@@ -4,17 +4,19 @@ use crate::lexer::token::TokenType;
 pub enum ASTNode {
     Program(Box<Vec<ASTNode>>),
 
+    IfStatement(IfStatement),
+    BlockStatement(BlockStatement),
+    ReturnStatement(Box<ASTNode>),
+    ForStatement(ForStatement),
+
     MemberExpression(MemberExpression),
     FunctionExpression(FunctionExpression),
     FunctionCall(FunctionCall),
 
-    ReturnExpression(Box<ASTNode>),
     VariableExpression(VariableExpression),
     BinaryExpression(BinaryExpression),
     UnaryExpression(Box<ASTNode>),
-
-    IfStatement(IfStatement),
-    BlockStatement(BlockStatement),
+    RangeExpression(RangeExpression),
 
     Number(f64),
     Boolean(bool),
@@ -24,6 +26,26 @@ pub enum ASTNode {
     List(Box<Vec<ASTNode>>),
 
     Command(Box<Vec<ASTNode>>),
+}
+
+#[derive(Debug, Clone)]
+pub struct ForStatement {
+    pub variable: String,
+    pub iterable: Box<Iterable>,
+    pub body: Box<ASTNode>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Iterable {
+    RangeExpression(RangeExpression),
+    Collection(ASTNode),
+}
+
+#[derive(Debug, Clone)]
+pub struct RangeExpression {
+    pub start: Box<ASTNode>,
+    pub end: Box<ASTNode>,
+    pub increment: Option<Box<ASTNode>>,
 }
 
 #[derive(Debug, Clone)]

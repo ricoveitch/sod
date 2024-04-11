@@ -17,6 +17,12 @@ fn math_expressions() {
     assert_expr("-2 ^ 2", Symbol::Number(-4.0));
 }
 
+#[should_panic]
+#[test]
+fn invalid_number() {
+    eval_expr("1.");
+}
+
 #[test]
 fn math_expression_statements() {
     assert_expr("x = 2 * 3\n x+3", Symbol::Number(9.0));
@@ -151,4 +157,24 @@ fn lists() {
     assert_expr("x = [5]\nx_0 = x[0]\nx_0 = 1\nx[0]", Symbol::Number(5.0));
     assert_expr("x = [1,2,3]\nx.remove(1)\nx[1]", Symbol::Number(3.0));
     assert_expr("x = [1,2]\nx.insert(1,4)\nx[1]", Symbol::Number(4.0));
+    assert_expr(
+        "t = 0\nx = [5,2]\nfor v in x {\nt = t + v\n}\nt",
+        Symbol::Number(7.0),
+    );
+}
+
+#[test]
+fn ranges() {
+    assert_expr(
+        "t = 0\nfor v in 1..3 {\n t = t + v\n}\nt",
+        Symbol::Number(3.0),
+    );
+    assert_expr(
+        "t = 0\nfor v in 1..4..2 {\n t = t + v\n}\nt",
+        Symbol::Number(4.0),
+    );
+    assert_expr(
+        "t = 0\nfor v in 4..1..-1 {\n t = t + v\n}\nt",
+        Symbol::Number(9.0),
+    );
 }

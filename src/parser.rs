@@ -3,8 +3,9 @@ use std::collections::HashSet;
 
 use crate::{
     ast::ast::{
-        ASTNode, BinaryExpression, BlockStatement, FunctionCall, FunctionExpression, IfStatement,
-        MemberExpression, MemberExpressionKind, VariableExpression,
+        self, ASTNode, BinaryExpression, BlockStatement, ForStatement, FunctionCall,
+        FunctionExpression, IfStatement, MemberExpression, MemberExpressionKind, RangeExpression,
+        VariableExpression,
     },
     common::bash,
     lexer::{lexer, token::TokenType},
@@ -173,11 +174,66 @@ impl Parser {
             match ident.as_str() {
                 "func" => return self.function_expression(),
                 "if" => return self.if_statement(),
+                "for" => return self.for_statement(),
                 _ => (),
             };
         };
 
         self.expression(0)
+    }
+
+    /**
+     * for_statement
+     *   = "for" identifier range_expression block_statement
+     */
+    fn for_statement(&mut self) -> ASTNode {
+        self.eat(&TokenType::Identifier("for".to_string()));
+        let variable = self.eat_identifier();
+        self.eat(&TokenType::Identifier("in".to_string()));
+        let iterable = self.iterable();
+        let body = self.block_statement();
+
+        ASTNode::ForStatement(ForStatement {
+            variable,
+            iterable: Box::new(iterable),
+            body: Box::new(body),
+        })
+    }
+
+    /**
+     * iterable
+     *   = (range_expression | expression)
+     */
+    fn iterable(&mut self) -> ast::Iterable {
+        let expression = self.expression(0);
+        match self.curr_token {
+            TokenType::Dot => ast::Iterable::RangeExpression(self.range_expression(expression)),
+            _ => ast::Iterable::Collection(expression),
+        }
+    }
+
+    /**
+     *  range_expression
+     *   = start_expression ".." end_expression (".." increment_expression)?
+     */
+    fn range_expression(&mut self, start: ASTNode) -> RangeExpression {
+        self.eat(&TokenType::Dot);
+        self.eat(&TokenType::Dot);
+        let end = self.expression(0);
+
+        let increment = if self.curr_token == TokenType::Dot {
+            self.eat(&TokenType::Dot);
+            self.eat(&TokenType::Dot);
+            Some(Box::new(self.expression(0)))
+        } else {
+            None
+        };
+
+        RangeExpression {
+            start: Box::new(start),
+            end: Box::new(end),
+            increment,
+        }
     }
 
     /**
@@ -488,7 +544,7 @@ impl Parser {
     fn return_expression(&mut self) -> ASTNode {
         self.eat(&TokenType::Identifier("return".to_string()));
         let expression = self.expression(0);
-        ASTNode::ReturnExpression(Box::new(expression))
+        ASTNode::ReturnStatement(Box::new(expression))
     }
 
     /**

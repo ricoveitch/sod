@@ -1,12 +1,13 @@
 use super::ast::{
-    ASTNode, BinaryExpression, BlockStatement, FunctionCall, FunctionExpression, IfStatement,
-    MemberExpression, MemberExpressionKind, VariableExpression,
+    self, ASTNode, BinaryExpression, BlockStatement, ForStatement, FunctionCall,
+    FunctionExpression, IfStatement, MemberExpression, MemberExpressionKind, RangeExpression,
+    VariableExpression,
 };
 use crate::common::bash;
 use crate::lexer::token::TokenType;
 use crate::new_string_symbol;
 use crate::symbol::scope::ScopeKind;
-use crate::symbol::symbol::{self, List, Symbol};
+use crate::symbol::symbol::{self, List, Range, Symbol};
 use crate::symbol::table::SymbolTable;
 
 pub struct ASTEvaluator {
@@ -44,7 +45,7 @@ impl ASTEvaluator {
             ASTNode::MemberExpression(me) => self.eval_member_expression(me),
             ASTNode::FunctionExpression(fe) => {
                 self.symbol_table
-                    .insert(&fe.name, Symbol::Function(fe.clone()));
+                    .set(&fe.name, Symbol::Function(Box::new(fe.clone())));
                 None
             }
             ASTNode::FunctionCall(fc) => self.eval_function_call(fc),
@@ -52,16 +53,25 @@ impl ASTEvaluator {
                 self.eval_if_statement(is);
                 None
             }
+
             ASTNode::BlockStatement(bs) => self.eval_block_statement(bs),
-            ASTNode::ReturnExpression(expr) => self.eval_node(*expr),
+            ASTNode::ReturnStatement(expr) => self.eval_node(*expr),
+            ASTNode::ForStatement(fs) => {
+                self.eval_for_statement(fs);
+                None
+            }
 
             ASTNode::Number(value) => Some(Symbol::Number(value)),
             ASTNode::Boolean(value) => Some(Symbol::Boolean(value)),
             ASTNode::String(value) => Some(new_string_symbol!(value)),
             ASTNode::List(nodes) => Some(self.eval_list(*nodes)),
             ASTNode::None => Some(Symbol::None),
+            ASTNode::RangeExpression(range_expr) => {
+                Some(Symbol::Range(self.visit_range_expression(range_expr)))
+            }
 
             ASTNode::Command(cmd) => Some(self.eval_command(*cmd)),
+            // TODO: allow returning reference to a symbol in the future.
             ASTNode::Identifier(ident) => Some(self.get_symbol(&ident).clone()),
             ASTNode::Program(_) => None,
         }
@@ -83,6 +93,53 @@ impl ASTEvaluator {
                 panic!("'{}' is not defined", name);
             }
         }
+    }
+
+    fn visit_range_expression(&mut self, range_expr: RangeExpression) -> Range {
+        let mut visit_range_prop = |node: ASTNode, label: &str| match self.eval_node(node) {
+            Some(symbol) => match symbol {
+                Symbol::Number(num) => num as i32,
+                _ => panic!("range {} must be a number", label),
+            },
+            None => panic!("invalid range"),
+        };
+
+        let start = visit_range_prop(*range_expr.start, "start");
+        let end = visit_range_prop(*range_expr.end, "end");
+        let increment = if let Some(inc) = range_expr.increment {
+            Some(visit_range_prop(*inc, "increment"))
+        } else {
+            None
+        };
+
+        Range::new(start, end, increment)
+    }
+
+    fn visit_iterable(&mut self, iterable: ast::Iterable) -> Box<dyn Iterator<Item = Symbol>> {
+        match iterable {
+            ast::Iterable::RangeExpression(re) => Box::new(self.visit_range_expression(re)),
+            ast::Iterable::Collection(node) => match self.eval_node(node) {
+                Some(symbol) => match symbol {
+                    Symbol::List(list) => Box::new(list.items.into_iter()),
+                    Symbol::String(ss) => Box::new(ss.into_iter()),
+                    _ => panic!("{} is not iterable", symbol.kind()),
+                },
+                None => panic!("iterator not found"),
+            },
+        }
+    }
+
+    fn eval_for_statement(&mut self, for_statement: ForStatement) {
+        let iterable = self.visit_iterable(*for_statement.iterable);
+        self.symbol_table.push_scope(ScopeKind::ForBlock);
+
+        for symbol in iterable {
+            self.symbol_table
+                .set(for_statement.variable.as_str(), symbol);
+            self.eval_node(*for_statement.body.clone());
+        }
+
+        self.symbol_table.pop_scope();
     }
 
     fn eval_member_expression(&mut self, me: MemberExpression) -> Option<Symbol> {
@@ -114,7 +171,7 @@ impl ASTEvaluator {
         match symbol {
             Symbol::List(list) => list.call(call, args),
             Symbol::String(ss) => ss.call(call, args),
-            _ => panic!("{} has no member {}", symbol, call),
+            _ => panic!("{} has no member {}", symbol.kind(), call),
         }
     }
 
@@ -170,13 +227,14 @@ impl ASTEvaluator {
         }
 
         let output = bash::run_cmd(&cmd_string);
+        print!("{}", output);
         new_string_symbol!(output)
     }
 
     fn eval_block_statement(&mut self, block_statement: BlockStatement) -> Option<Symbol> {
         for node in *block_statement.body {
             match node {
-                ASTNode::ReturnExpression(expr) => return self.eval_node(*expr),
+                ASTNode::ReturnStatement(expr) => return self.eval_node(*expr),
                 _ => self.eval_node(node),
             };
         }
@@ -222,7 +280,7 @@ impl ASTEvaluator {
         self.symbol_table.push_scope(ScopeKind::FunctionBlock);
 
         for (arg_name, arg_value) in args {
-            self.symbol_table.insert(arg_name, arg_value);
+            self.symbol_table.set(arg_name, arg_value);
         }
     }
 
@@ -248,7 +306,7 @@ impl ASTEvaluator {
         };
 
         match *node.lhs {
-            ASTNode::Identifier(ident) => self.symbol_table.insert(&ident, rhs),
+            ASTNode::Identifier(ident) => self.symbol_table.set(&ident, rhs),
             ASTNode::MemberExpression(me) => match *me.kind {
                 MemberExpressionKind::Index(expr) => {
                     let lhs_symbol = self.eval_member_index_mut(me.identifier.as_str(), expr);

@@ -61,7 +61,7 @@ impl SymbolTable {
         Some(symbol)
     }
 
-    pub fn insert(&mut self, name: &str, symbol: Symbol) {
+    pub fn set(&mut self, name: &str, symbol: Symbol) {
         if let Some(existing_symbol) = self.get_mut(name) {
             *existing_symbol = symbol;
             return;

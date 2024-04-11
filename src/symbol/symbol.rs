@@ -7,8 +7,9 @@ pub enum Symbol {
     Boolean(bool),
     String(StringSymbol),
     List(List),
+    Range(Range),
     None,
-    Function(FunctionExpression),
+    Function(Box<FunctionExpression>),
 }
 
 #[macro_export]
@@ -16,6 +17,51 @@ macro_rules! new_string_symbol {
     ($v:expr) => {
         $crate::symbol::symbol::Symbol::String($crate::symbol::symbol::StringSymbol::new($v))
     };
+}
+
+#[derive(Debug, Clone)]
+pub struct Range {
+    pub start: i32,
+    pub end: i32,
+    pub increment: i32,
+    ticker: i32,
+}
+
+impl Range {
+    pub fn new(start: i32, end: i32, increment: Option<i32>) -> Self {
+        Self {
+            start,
+            end,
+            increment: increment.unwrap_or(1),
+            ticker: start,
+        }
+    }
+
+    fn next(&mut self) -> Option<Symbol> {
+        if self.increment > 0 && self.ticker >= self.end {
+            return None;
+        } else if self.increment < 0 && self.ticker <= self.end {
+            return None;
+        }
+
+        let result = Symbol::Number(self.ticker as f64);
+        self.ticker += self.increment;
+        Some(result)
+    }
+}
+
+impl Iterator for Range {
+    type Item = Symbol;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next()
+    }
+}
+
+impl PartialEq for Range {
+    fn eq(&self, _: &Self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -112,6 +158,37 @@ impl StringSymbol {
             "len" => Some(self.len()),
             "push" => Some(self.push(args)),
             _ => panic!("string has no member '{}'", fname),
+        }
+    }
+}
+
+pub struct StringSymbolIterator {
+    value: String,
+    index: usize,
+}
+
+impl Iterator for StringSymbolIterator {
+    type Item = Symbol;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.value.len() {
+            let next = new_string_symbol!(self.value.chars().nth(self.index).unwrap().to_string());
+            self.index += 1;
+            Some(next)
+        } else {
+            None
+        }
+    }
+}
+
+impl IntoIterator for StringSymbol {
+    type Item = Symbol;
+    type IntoIter = StringSymbolIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        StringSymbolIterator {
+            value: self.value,
+            index: 0,
         }
     }
 }
@@ -322,6 +399,7 @@ impl std::fmt::Display for Symbol {
                 let items: Vec<String> = list.items.iter().map(|f| f.to_string()).collect();
                 format!("{:?}", items)
             }
+            Symbol::Range(range) => format!("{}..{}..{}", range.start, range.end, range.increment),
         };
 
         write!(f, "{}", s)
@@ -337,6 +415,21 @@ impl Symbol {
             Symbol::String(s) => s.value.len() > 0,
             Symbol::List(_) => true,
             Symbol::None => false,
+            Symbol::Range(_) => true,
         }
+    }
+
+    pub fn kind(&self) -> String {
+        let s = match self {
+            Symbol::Number(_) => "number",
+            Symbol::Boolean(_) => "boolean",
+            Symbol::Function(_) => "function",
+            Symbol::String(_) => "string",
+            Symbol::List(_) => "list",
+            Symbol::None => "none",
+            Symbol::Range(_) => "range",
+        };
+
+        s.to_string()
     }
 }

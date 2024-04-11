@@ -42,8 +42,8 @@ impl Lexer {
 
     fn read_digit(&self) -> Result<(TokenType, usize), Box<dyn Error>> {
         let mut seen_dot = false;
-        let (bytes, bytes_read) = self.read_while(
-            |b: &u8| {
+        let read = self.read_while(
+            |b| {
                 if b == &b'.' {
                     if seen_dot {
                         return false;
@@ -56,6 +56,20 @@ impl Lexer {
             },
             0,
         );
+
+        // trim trailing dots
+        let (bytes, bytes_read) = {
+            let (mut bytes, _) = read;
+            for i in (0..bytes.len()).rev() {
+                if bytes[i] == b'.' {
+                    bytes.pop();
+                } else {
+                    break;
+                }
+            }
+            let len = bytes.len();
+            (bytes, len)
+        };
 
         let s = String::from_utf8(bytes)?;
 

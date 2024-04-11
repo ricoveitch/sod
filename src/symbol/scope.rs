@@ -3,6 +3,7 @@ pub enum ScopeKind {
     Global,
     FunctionBlock,
     ConditionalBlock,
+    ForBlock,
 }
 
 pub struct Scope {
@@ -58,7 +59,7 @@ impl ScopeStack {
 
     pub fn push(&mut self, kind: ScopeKind) -> usize {
         let id = match kind {
-            ScopeKind::ConditionalBlock => self.push_scope(kind),
+            ScopeKind::ConditionalBlock | ScopeKind::ForBlock => self.push_scope(kind),
             ScopeKind::FunctionBlock => self.push_scope_stack(kind),
             ScopeKind::Global => panic!("not able to push another global scope"),
         };
