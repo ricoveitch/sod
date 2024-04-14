@@ -5,7 +5,15 @@ use std::fs;
 use std::io::{self, Write};
 use std::process;
 
-fn parse_file(filename: &str) {
+fn get_argv(env_args: Vec<String>) -> Vec<String> {
+    let mut argv = env_args.clone();
+    argv.remove(0);
+    argv
+}
+
+fn parse_file(env_args: Vec<String>) {
+    let argv = get_argv(env_args);
+    let filename = argv.get(0).unwrap();
     let src = match fs::read_to_string(filename) {
         Ok(s) => s,
         Err(err) => {
@@ -15,12 +23,12 @@ fn parse_file(filename: &str) {
     };
 
     let ast = Parser::new(&src).parse();
-    let mut evaluator = ASTEvaluator::new();
+    let mut evaluator = ASTEvaluator::new(argv);
     evaluator.eval(ast);
 }
 
 fn interpret() {
-    let mut evaluator = ASTEvaluator::new();
+    let mut evaluator = ASTEvaluator::new(vec![]);
     loop {
         print!("> ");
         std::io::stdout().flush().unwrap();
@@ -39,13 +47,10 @@ fn interpret() {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() > 2 {
-        eprintln!("Usage: {} [filename]", args[0]);
-        std::process::exit(1);
-    }
 
-    match args.get(1) {
-        Some(filename) => parse_file(filename),
-        None => interpret(),
-    };
+    if args.len() >= 2 {
+        parse_file(args);
+    } else {
+        interpret()
+    }
 }

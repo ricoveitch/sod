@@ -4,7 +4,7 @@ pub mod utils {
     use orca::symbol::symbol::Symbol;
 
     pub fn eval_expr(expr: &str) -> Vec<Option<Symbol>> {
-        let mut evaluator = ASTEvaluator::new();
+        let mut evaluator = ASTEvaluator::new(vec![]);
         let program = Parser::new(expr).parse();
         evaluator.eval(program)
     }
@@ -17,7 +17,7 @@ pub mod utils {
 
     #[allow(dead_code)]
     pub fn assert_exprs(exprs: Vec<&str>, expected: Vec<Symbol>) {
-        let mut evaluator = ASTEvaluator::new();
+        let mut evaluator = ASTEvaluator::new(vec![]);
         for (expr, expected) in exprs.iter().zip(expected.iter()) {
             let program = Parser::new(expr).parse();
             let evaluation = evaluator.eval(program);

@@ -10,8 +10,9 @@ pub enum ASTNode {
     ForStatement(ForStatement),
 
     MemberExpression(MemberExpression),
-    FunctionExpression(FunctionExpression),
-    FunctionCall(FunctionCall),
+    IndexExpression(IndexExpression),
+    FunctionStatement(FunctionStatement),
+    CallExpression(CallExpression),
 
     VariableExpression(VariableExpression),
     BinaryExpression(BinaryExpression),
@@ -48,16 +49,23 @@ pub struct RangeExpression {
     pub increment: Option<Box<ASTNode>>,
 }
 
+// x.y = MemberExpression (base = idenitifier(x), identifier(argv))
+// x[0] = MemberExpression (index)
+// process.argv[0] = MemberExpression (base = MemberExpression(base = process, identifier(argv)), Index(0))
+// x.foo() CallExpression (callee/base = MemberExpression)
+// foo() CallExpression (callee/base = identifier)
+
 #[derive(Debug, Clone)]
-pub enum MemberExpressionKind {
-    Index(ASTNode),
-    Call(FunctionCall),
+pub struct IndexExpression {
+    pub base: Box<ASTNode>,
+    pub index: Box<ASTNode>,
 }
 
 #[derive(Debug, Clone)]
 pub struct MemberExpression {
-    pub identifier: String,
-    pub kind: Box<MemberExpressionKind>,
+    //  pub identifier: String, // this needs to be abstract
+    pub base: Box<ASTNode>,
+    pub property: String,
 }
 
 #[derive(Debug, Clone)]
@@ -74,21 +82,21 @@ pub struct VariableExpression {
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionExpression {
+pub struct FunctionStatement {
     pub name: String,
     pub body: Box<ASTNode>,
     pub args: Vec<String>,
 }
 
-impl PartialEq for FunctionExpression {
+impl PartialEq for FunctionStatement {
     fn eq(&self, _: &Self) -> bool {
         false
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionCall {
-    pub name: String,
+pub struct CallExpression {
+    pub base: Box<ASTNode>,
     pub args: Vec<ASTNode>,
 }
 

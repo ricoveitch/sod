@@ -1,4 +1,6 @@
-use crate::ast::ast::FunctionExpression;
+use std::collections::HashMap;
+
+use crate::ast::ast::FunctionStatement;
 use crate::lexer::token::TokenType;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -9,7 +11,8 @@ pub enum Symbol {
     List(List),
     Range(Range),
     None,
-    Function(Box<FunctionExpression>),
+    Function(Box<FunctionStatement>),
+    Object(Object),
 }
 
 #[macro_export]
@@ -17,6 +20,44 @@ macro_rules! new_string_symbol {
     ($v:expr) => {
         $crate::symbol::symbol::Symbol::String($crate::symbol::symbol::StringSymbol::new($v))
     };
+}
+
+pub fn get_global_vars(argv: Vec<String>) -> Vec<(&'static str, Symbol)> {
+    // change process to script?
+    vec![(
+        "process",
+        Symbol::Object(Object::from(vec![(
+            "argv",
+            Symbol::List(List::from(
+                argv.iter()
+                    .map(|arg| new_string_symbol!(arg.to_string()))
+                    .collect(),
+            )),
+        )])),
+    )]
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct Object {
+    mapping: HashMap<String, Symbol>,
+}
+
+impl Object {
+    pub fn from(items: Vec<(&str, Symbol)>) -> Self {
+        let mut mapping = HashMap::new();
+        for (key, value) in items {
+            mapping.insert(key.to_string(), value);
+        }
+        Self { mapping }
+    }
+
+    pub fn get(&self, key: &str) -> &Symbol {
+        self.mapping.get(key).unwrap_or(&Symbol::None)
+    }
+
+    pub fn get_mut(&mut self, key: &str) -> &mut Symbol {
+        self.mapping.get_mut(key).unwrap()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -74,9 +115,9 @@ impl StringSymbol {
         Self { value: s }
     }
 
-    pub fn get(&self, index: usize) -> Self {
+    pub fn get(&self, index: usize) -> Symbol {
         match self.value.chars().nth(index) {
-            Some(c) => StringSymbol::new(c.to_string()),
+            Some(c) => new_string_symbol!(c.to_string()),
             None => panic!("string index out of range"),
         }
     }
@@ -147,6 +188,11 @@ impl StringSymbol {
         self.len()
     }
 
+    fn trim(&mut self) -> Symbol {
+        let trimmed = self.value.trim();
+        new_string_symbol!(trimmed.to_string())
+    }
+
     pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Option<Symbol> {
         match fname {
             "insert" => {
@@ -157,6 +203,7 @@ impl StringSymbol {
             "pop" => self.pop(),
             "len" => Some(self.len()),
             "push" => Some(self.push(args)),
+            "trim" => Some(self.trim()),
             _ => panic!("string has no member '{}'", fname),
         }
     }
@@ -205,6 +252,10 @@ pub struct List {
 }
 
 impl List {
+    pub fn from(items: Vec<Symbol>) -> Self {
+        Self { items }
+    }
+
     pub fn len(&self) -> Symbol {
         Symbol::Number(self.items.len() as f64)
     }
@@ -400,6 +451,7 @@ impl std::fmt::Display for Symbol {
                 format!("{:?}", items)
             }
             Symbol::Range(range) => format!("{}..{}..{}", range.start, range.end, range.increment),
+            Symbol::Object(obj) => format!("{:?}", obj.mapping),
         };
 
         write!(f, "{}", s)
@@ -416,6 +468,7 @@ impl Symbol {
             Symbol::List(_) => true,
             Symbol::None => false,
             Symbol::Range(_) => true,
+            Symbol::Object(_) => true,
         }
     }
 
@@ -428,6 +481,7 @@ impl Symbol {
             Symbol::List(_) => "list",
             Symbol::None => "none",
             Symbol::Range(_) => "range",
+            Symbol::Object(_) => "object",
         };
 
         s.to_string()

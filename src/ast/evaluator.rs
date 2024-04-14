@@ -1,6 +1,6 @@
 use super::ast::{
-    self, ASTNode, BinaryExpression, BlockStatement, ForStatement, FunctionCall,
-    FunctionExpression, IfStatement, MemberExpression, MemberExpressionKind, RangeExpression,
+    self, ASTNode, BinaryExpression, BlockStatement, CallExpression, ForStatement,
+    FunctionStatement, IfStatement, IndexExpression, MemberExpression, RangeExpression,
     VariableExpression,
 };
 use crate::common::bash;
@@ -15,9 +15,10 @@ pub struct ASTEvaluator {
 }
 
 impl ASTEvaluator {
-    pub fn new() -> ASTEvaluator {
-        ASTEvaluator {
-            symbol_table: SymbolTable::new(),
+    pub fn new(argv: Vec<String>) -> Self {
+        let global_vars = symbol::get_global_vars(argv);
+        Self {
+            symbol_table: SymbolTable::from(global_vars),
         }
     }
 
@@ -42,13 +43,14 @@ impl ASTEvaluator {
                 self.eval_variable_expression(ve);
                 None
             }
-            ASTNode::MemberExpression(me) => self.eval_member_expression(me),
-            ASTNode::FunctionExpression(fe) => {
+            ASTNode::MemberExpression(me) => Some(self.visit_member_expression(me).clone()),
+            ASTNode::IndexExpression(ie) => Some(self.visit_index_expression(ie)),
+            ASTNode::FunctionStatement(fs) => {
                 self.symbol_table
-                    .set(&fe.name, Symbol::Function(Box::new(fe.clone())));
+                    .set(&fs.name.clone(), Symbol::Function(Box::new(fs)));
                 None
             }
-            ASTNode::FunctionCall(fc) => self.eval_function_call(fc),
+            ASTNode::CallExpression(fc) => self.eval_call_expression(fc),
             ASTNode::IfStatement(is) => {
                 self.eval_if_statement(is);
                 None
@@ -74,6 +76,14 @@ impl ASTEvaluator {
             // TODO: allow returning reference to a symbol in the future.
             ASTNode::Identifier(ident) => Some(self.get_symbol(&ident).clone()),
             ASTNode::Program(_) => None,
+        }
+    }
+
+    fn visit_node_mut(&mut self, node: ASTNode) -> &mut Symbol {
+        match node {
+            ASTNode::MemberExpression(me) => self.visit_member_expression_mut(me),
+            ASTNode::Identifier(ident) => self.get_symbol_mut(&ident),
+            _ => panic!("not mutable"),
         }
     }
 
@@ -142,15 +152,6 @@ impl ASTEvaluator {
         self.symbol_table.pop_scope();
     }
 
-    fn eval_member_expression(&mut self, me: MemberExpression) -> Option<Symbol> {
-        match *me.kind {
-            MemberExpressionKind::Index(expr) => {
-                Some(self.eval_member_index(me.identifier.as_str(), expr))
-            }
-            MemberExpressionKind::Call(call) => self.eval_symbol_call(me.identifier.as_str(), call),
-        }
-    }
-
     fn visit_function_args(&mut self, args: Vec<ASTNode>) -> Vec<Symbol> {
         let mut result = vec![];
         for node in args {
@@ -161,49 +162,6 @@ impl ASTEvaluator {
         }
 
         result
-    }
-
-    fn eval_symbol_call(&mut self, indent: &str, call: FunctionCall) -> Option<Symbol> {
-        let args = self.visit_function_args(call.args);
-        let call = call.name.as_str();
-        let symbol = self.get_symbol_mut(&indent);
-
-        match symbol {
-            Symbol::List(list) => list.call(call, args),
-            Symbol::String(ss) => ss.call(call, args),
-            _ => panic!("{} has no member {}", symbol.kind(), call),
-        }
-    }
-
-    fn visit_index_expression(&mut self, expression: ASTNode) -> usize {
-        let expr_symbol = match self.eval_node(expression) {
-            Some(s) => s,
-            None => panic!("indices must be numbers"),
-        };
-
-        match expr_symbol {
-            Symbol::Number(index) => index as usize,
-            _ => panic!("indices must be numbers"),
-        }
-    }
-
-    fn eval_member_index(&mut self, member: &str, expression: ASTNode) -> Symbol {
-        let index = self.visit_index_expression(expression);
-
-        match self.get_symbol(&member) {
-            Symbol::List(list) => list.get(index).clone(),
-            Symbol::String(string) => Symbol::String(string.get(index)),
-            _ => panic!("object {} is not indexable", member),
-        }
-    }
-
-    fn eval_member_index_mut(&mut self, member: &str, expression: ASTNode) -> &mut Symbol {
-        let index = self.visit_index_expression(expression);
-
-        match self.get_symbol_mut(&member) {
-            Symbol::List(list) => list.get_mut(index),
-            _ => panic!("object {} is not indexable", member),
-        }
     }
 
     fn eval_list(&mut self, nodes: Vec<ASTNode>) -> Symbol {
@@ -259,7 +217,7 @@ impl ASTEvaluator {
         }
     }
 
-    fn validate_function_call(&self, func_call: &FunctionCall, func_expr: &FunctionExpression) {
+    fn validate_function_call(&self, func_call: &CallExpression, func_expr: &FunctionStatement) {
         if func_call.args.len() < func_expr.args.len() {
             panic!(
                 "{} missing function args expected {} received {}",
@@ -270,7 +228,7 @@ impl ASTEvaluator {
         }
     }
 
-    fn push_function(&mut self, func_call: FunctionCall, func_expr: &FunctionExpression) {
+    fn push_function(&mut self, func_call: CallExpression, func_expr: &FunctionStatement) {
         let arg_values = self.visit_function_args(func_call.args);
         let mut args = vec![];
         for (name, value) in func_expr.args.iter().zip(arg_values.iter()) {
@@ -284,37 +242,119 @@ impl ASTEvaluator {
         }
     }
 
-    fn eval_function_call(&mut self, func_call: FunctionCall) -> Option<Symbol> {
-        let func_expr = match self.get_symbol(&func_call.name) {
+    fn visit_function(&mut self, func_name: &str, call_expr: CallExpression) -> Option<Symbol> {
+        let func_expr = match self.get_symbol(func_name) {
             Symbol::Function(f) => f.clone(),
             _ => return None,
         };
 
-        self.validate_function_call(&func_call, &func_expr);
+        self.validate_function_call(&call_expr, &func_expr);
 
-        self.push_function(func_call, &func_expr);
+        self.push_function(call_expr, &func_expr);
         let res = self.eval_node(*func_expr.body);
         self.symbol_table.pop_scope();
 
         res
     }
 
+    fn visit_member_expression_call(
+        &mut self,
+        member_expr: MemberExpression,
+        ast_args: Vec<ASTNode>,
+    ) -> Option<Symbol> {
+        let args = self.visit_function_args(ast_args);
+        let call = member_expr.property.as_str();
+        let symbol = self.visit_node_mut(*member_expr.base);
+
+        match symbol {
+            Symbol::List(list) => list.call(call, args),
+            Symbol::String(ss) => ss.call(call, args),
+            _ => panic!("{} has no member {}", symbol.kind(), call),
+        }
+    }
+
+    fn eval_call_expression(&mut self, call_expr: CallExpression) -> Option<Symbol> {
+        match *call_expr.base {
+            ASTNode::Identifier(ref fname) => {
+                self.visit_function(fname.clone().as_str(), call_expr)
+            }
+            ASTNode::MemberExpression(me) => self.visit_member_expression_call(me, call_expr.args),
+            _ => unimplemented!("object is not callable"),
+        }
+    }
+
+    fn eval_index(&mut self, expression: ASTNode) -> usize {
+        let expr_symbol = match self.eval_node(expression) {
+            Some(s) => s,
+            None => panic!("indices must be numbers"),
+        };
+
+        // TODO: later use u64 instead for [-1] list access?
+        match expr_symbol {
+            Symbol::Number(index) => index as usize,
+            _ => panic!("indices must be numbers"),
+        }
+    }
+
+    fn visit_index_expression(&mut self, index_expr: IndexExpression) -> Symbol {
+        let index = self.eval_index(*index_expr.index);
+        let symbol = self.eval_node(*index_expr.base).unwrap();
+
+        match symbol {
+            Symbol::List(list) => list.get(index).clone(),
+            Symbol::String(ss) => ss.get(index),
+            _ => panic!("{} is not indexable", symbol.kind()),
+        }
+    }
+
+    fn visit_index_expression_mut(&mut self, index_expr: IndexExpression) -> &mut Symbol {
+        let index = self.eval_index(*index_expr.index);
+        let symbol = self.visit_node_mut(*index_expr.base);
+
+        match symbol {
+            Symbol::List(list) => list.get_mut(index),
+            Symbol::String(_) => unimplemented!("mutable index access for strings"),
+            _ => panic!("object is not indexable"),
+        }
+    }
+
+    fn visit_member_expression(&mut self, member_expr: MemberExpression) -> Symbol {
+        let symbol = match *member_expr.base {
+            ASTNode::Identifier(ident) => self.get_symbol(ident.as_str()),
+            _ => unimplemented!("TODO"),
+        };
+
+        match symbol {
+            Symbol::Object(obj) => obj.get(member_expr.property.as_str()).clone(),
+            _ => panic!("{} has no property {}", symbol.kind(), member_expr.property),
+        }
+    }
+
+    fn visit_member_expression_mut(&mut self, member_expr: MemberExpression) -> &mut Symbol {
+        let symbol = match *member_expr.base {
+            ASTNode::Identifier(ident) => self.get_symbol_mut(ident.as_str()),
+            _ => unimplemented!("object not supported"),
+        };
+
+        match symbol {
+            Symbol::Object(obj) => obj.get_mut(member_expr.property.as_str()),
+            _ => panic!("{} has no property {}", symbol.kind(), member_expr.property),
+        }
+    }
+
     fn eval_variable_expression(&mut self, node: VariableExpression) {
         let rhs = match self.eval_node(*node.rhs) {
             Some(s) => s,
-            None => panic!("TODO: complete when adding None type."),
+            None => panic!("right hand side not found"),
         };
 
         match *node.lhs {
             ASTNode::Identifier(ident) => self.symbol_table.set(&ident, rhs),
-            ASTNode::MemberExpression(me) => match *me.kind {
-                MemberExpressionKind::Index(expr) => {
-                    let lhs_symbol = self.eval_member_index_mut(me.identifier.as_str(), expr);
-                    *lhs_symbol = rhs;
-                }
-                _ => unimplemented!("member expression must use an index"),
-            },
-            _ => unimplemented!("left hand side must be identifier or member expression"),
+            ASTNode::IndexExpression(ie) => {
+                let lhs_symbol = self.visit_index_expression_mut(ie);
+                *lhs_symbol = rhs;
+            }
+            _ => unimplemented!("object assignment"),
         }
     }
 

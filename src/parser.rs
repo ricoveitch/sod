@@ -3,8 +3,8 @@ use std::collections::HashSet;
 
 use crate::{
     ast::ast::{
-        self, ASTNode, BinaryExpression, BlockStatement, ForStatement, FunctionCall,
-        FunctionExpression, IfStatement, MemberExpression, MemberExpressionKind, RangeExpression,
+        self, ASTNode, BinaryExpression, BlockStatement, CallExpression, ForStatement,
+        FunctionStatement, IfStatement, IndexExpression, MemberExpression, RangeExpression,
         VariableExpression,
     },
     common::bash,
@@ -349,7 +349,7 @@ impl Parser {
         self.eat(&TokenType::CloseParen);
         let body = self.block_statement();
 
-        ASTNode::FunctionExpression(FunctionExpression {
+        ASTNode::FunctionStatement(FunctionStatement {
             name,
             body: Box::new(body),
             args: func_args,
@@ -382,7 +382,7 @@ impl Parser {
      *   = parenthesized_expression
      *   / unary_expression
      *   / return_expression
-     *   / function_call
+     *   / call_expression
      *   / command
      *   / symbol
      */
@@ -423,9 +423,11 @@ impl Parser {
 
     fn parse_identifier(&mut self, ident: String) -> ASTNode {
         match self.lookahead(1) {
-            TokenType::OpenParen => return ASTNode::FunctionCall(self.function_call()),
-            TokenType::OpenSqBracket => return self.member_index_expression(),
-            TokenType::Dot => return self.member_call_expression(),
+            TokenType::OpenParen => {
+                self.advance_token();
+                return self.call_expression(ASTNode::Identifier(ident));
+            }
+            TokenType::OpenSqBracket | TokenType::Dot => return self.member_expression(),
             _ => (),
         };
 
@@ -450,38 +452,59 @@ impl Parser {
     }
 
     /**
-     * identifier "." function_call
+     * identifier member_prefix_expression
      */
-    fn member_call_expression(&mut self) -> ASTNode {
+    fn member_expression(&mut self) -> ASTNode {
         let ident = self.eat_identifier();
-        self.eat(&TokenType::Dot);
-        let call = self.function_call();
+        let mut base = ASTNode::Identifier(ident);
 
-        ASTNode::MemberExpression(MemberExpression {
-            identifier: ident,
-            kind: Box::new(MemberExpressionKind::Call(call)),
-        })
+        loop {
+            let (new_base, more) = self.member_prefix_expression(base);
+            base = new_base;
+            if !more {
+                break;
+            }
+        }
+
+        // this could be parsed better
+        if self.curr_token == TokenType::Equals {
+            self.variable_statement(base)
+        } else {
+            base
+        }
     }
 
     /**
-     * identifier "[" (expression) "]"
+     * member_prefix_expression =
+     *    member_expression | index_expression | call_expression
      */
-    fn member_index_expression(&mut self) -> ASTNode {
-        let ident = self.eat_identifier();
-        self.eat(&TokenType::OpenSqBracket);
-        let expression = self.expression(0);
-        self.eat(&TokenType::CloseSqBracket);
+    fn member_prefix_expression(&mut self, base: ASTNode) -> (ASTNode, bool) {
+        let expression = match &self.curr_token {
+            &TokenType::Dot => {
+                self.eat(&TokenType::Dot);
+                let property = self.eat_identifier();
+                let me = MemberExpression {
+                    base: Box::new(base),
+                    property,
+                };
 
-        let member_expression = ASTNode::MemberExpression(MemberExpression {
-            identifier: ident,
-            kind: Box::new(MemberExpressionKind::Index(expression)),
-        });
+                ASTNode::MemberExpression(me)
+            }
+            &TokenType::OpenSqBracket => {
+                self.eat(&TokenType::OpenSqBracket);
+                let index = self.expression(0);
+                self.eat(&TokenType::CloseSqBracket);
 
-        if self.curr_token == TokenType::Equals {
-            self.variable_statement(member_expression)
-        } else {
-            member_expression
-        }
+                ASTNode::IndexExpression(IndexExpression {
+                    base: Box::new(base),
+                    index: Box::new(index),
+                })
+            }
+            &TokenType::OpenParen => self.call_expression(base),
+            _ => return (base, false),
+        };
+
+        (expression, true)
     }
 
     /*
@@ -548,23 +571,25 @@ impl Parser {
     }
 
     /**
-     * function_call
-     *    = identifier "(" function_call_args ")"
+     * call_expression
+     *    = identifier "(" call_expression_args ")"
      */
-    fn function_call(&mut self) -> FunctionCall {
-        let fname = self.eat_identifier();
+    fn call_expression(&mut self, base: ASTNode) -> ASTNode {
         self.eat(&TokenType::OpenParen);
-        let args = self.function_call_args();
+        let args = self.call_expression_args();
         self.eat(&TokenType::CloseParen);
 
-        FunctionCall { name: fname, args }
+        ASTNode::CallExpression(CallExpression {
+            base: Box::new(base),
+            args,
+        })
     }
 
     /**
-     * function_call_args
-     *   = ((identifier | LITERAL),)*
+     * call_expression_args
+     *   = "(" ((identifier | LITERAL),)* ")"
      */
-    fn function_call_args(&mut self) -> Vec<ASTNode> {
+    fn call_expression_args(&mut self) -> Vec<ASTNode> {
         if self.curr_token == TokenType::CloseParen {
             return vec![];
         }

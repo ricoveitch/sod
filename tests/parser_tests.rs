@@ -178,3 +178,8 @@ fn ranges() {
         Symbol::Number(9.0),
     );
 }
+
+#[test]
+fn global_vars() {
+    assert_expr("process.argv.len()", Symbol::Number(0.0));
+}

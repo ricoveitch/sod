@@ -9,19 +9,25 @@ type ScopeID = usize;
 type SymbolName = String;
 
 pub struct SymbolTable {
-    scoped_table: HashMap<ScopeID, HashMap<SymbolName, Symbol>>,
+    pub scoped_table: HashMap<ScopeID, HashMap<SymbolName, Symbol>>,
     scope: ScopeStack,
 }
 
 impl SymbolTable {
-    pub fn new() -> SymbolTable {
+    pub fn from(global_vars: Vec<(&str, Symbol)>) -> Self {
         let mut scoped_table = HashMap::new();
         scoped_table.insert(GLOBAL_SCOPE_ID, HashMap::new());
 
-        SymbolTable {
+        let mut symbol_table = SymbolTable {
             scoped_table,
             scope: ScopeStack::new(),
+        };
+
+        for (key, value) in global_vars {
+            symbol_table.set(key, value);
         }
+
+        symbol_table
     }
 
     fn find(&self, symbol_name: &str) -> Option<(ScopeID, &Symbol)> {
