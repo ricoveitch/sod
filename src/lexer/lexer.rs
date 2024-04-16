@@ -113,7 +113,6 @@ impl Lexer {
 
         match next {
             &b'=' => (TokenType::Le, 2),
-            &b'<' => (TokenType::HereDocument, 2),
             _ => (TokenType::LessThan, 1),
         }
     }
@@ -126,7 +125,6 @@ impl Lexer {
 
         match next {
             &b'=' => (TokenType::Ge, 2),
-            &b'>' => (TokenType::AppendOutput, 2),
             _ => (TokenType::GreaterThan, 1),
         }
     }
@@ -134,14 +132,14 @@ impl Lexer {
     fn read_and(&self) -> (TokenType, usize) {
         match self.peak_byte(1) {
             Some(b) if b == &b'&' => (TokenType::And, 2),
-            _ => (TokenType::Ampersand, 1),
+            _ => self.read_catch_all(b'&'),
         }
     }
 
     fn read_pipe(&self) -> (TokenType, usize) {
         match self.peak_byte(1) {
             Some(b) if b == &b'|' => (TokenType::Or, 2),
-            _ => (TokenType::Pipe, 1),
+            _ => self.read_catch_all(b'|'),
         }
     }
 
@@ -180,6 +178,15 @@ impl Lexer {
         (TokenType::Whitespace, bytes_read)
     }
 
+    fn read_catch_all(&self, byte: u8) -> (TokenType, usize) {
+        let s = match String::from_utf8(vec![byte]) {
+            Ok(s) => s,
+            Err(_) => panic!("invalid character {}", byte as char),
+        };
+
+        (TokenType::CatchAll(s), 1)
+    }
+
     fn peak(&self) -> (TokenType, usize) {
         let byte = match self.peak_byte(0) {
             Some(b) => b,
@@ -190,7 +197,6 @@ impl Lexer {
             b'-' => (TokenType::Minus, 1),
             b',' => (TokenType::Comma, 1),
             b';' => (TokenType::SemiColon, 1),
-            b'?' => (TokenType::QuestionMark, 1),
             b'.' => (TokenType::Dot, 1),
             b'(' => (TokenType::OpenParen, 1),
             b')' => (TokenType::CloseParen, 1),
@@ -201,9 +207,9 @@ impl Lexer {
             b'\n' => (TokenType::Newline, 1),
             b'^' => (TokenType::Carat, 1),
             b'+' => (TokenType::Plus, 1),
-            b'~' => (TokenType::Tilde, 1),
             b'[' => (TokenType::OpenSqBracket, 1),
             b']' => (TokenType::CloseSqBracket, 1),
+            b'\\' => (TokenType::BackSlash, 1),
             b'|' => self.read_pipe(),
             b'&' => self.read_and(),
             b'=' => self.read_equals(),
@@ -219,7 +225,7 @@ impl Lexer {
                 Err(e) => panic!("{}", e),
             },
             b if b.is_ascii_alphabetic() => self.read_identifier(),
-            _ => panic!("invalid character: {}", *byte as char),
+            _ => self.read_catch_all(*byte),
         }
     }
 

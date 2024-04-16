@@ -1,8 +1,24 @@
 use std::collections::HashSet;
 use std::env;
 use std::fs;
+use std::io;
 use std::os::unix::fs::PermissionsExt;
+use std::path;
 use std::process;
+
+fn is_executable(metadata: fs::Metadata) -> bool {
+    metadata.permissions().mode() & 0o111 != 0
+}
+
+fn entry_is_executable(file_path: path::PathBuf, entry: fs::DirEntry) -> Result<bool, io::Error> {
+    let metadata = entry.metadata()?;
+    if metadata.is_symlink() {
+        let canonical_path = fs::canonicalize(file_path)?;
+        return Ok(is_executable(fs::metadata(canonical_path)?));
+    }
+
+    Ok(is_executable(metadata))
+}
 
 fn read_dir(commands: &mut HashSet<String>, dir: &str) {
     let entries = match fs::read_dir(dir) {
@@ -16,18 +32,13 @@ fn read_dir(commands: &mut HashSet<String>, dir: &str) {
             Err(_) => continue,
         };
 
-        let metadata = match entry.metadata() {
-            Ok(m) => m,
-            Err(_) => continue,
-        };
-
         let filename = match entry.file_name().into_string() {
-            Ok(name) => name,
+            Ok(f) => f,
             Err(_) => continue,
         };
 
-        let is_executable = metadata.permissions().mode() & 0o111 != 0;
-        if metadata.is_file() && is_executable {
+        let full_path = path::Path::new(dir).join(filename.clone());
+        if entry_is_executable(full_path, entry).unwrap_or(false) {
             commands.insert(filename);
         }
     }

@@ -1,13 +1,12 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
-    Ampersand,
     And,
-    AppendOutput,
     Asterisk,
     Carat,
     CloseBraces,
     CloseParen,
     Comma,
+    BackSlash,
     Dot,
     DoubleEquals,
     EOF,
@@ -15,7 +14,6 @@ pub enum TokenType {
     ForwardSlash,
     Ge,
     GreaterThan,
-    HereDocument,
     Le,
     LessThan,
     OpenSqBracket,
@@ -27,12 +25,9 @@ pub enum TokenType {
     OpenBraces,
     OpenParen,
     Or,
-    Pipe,
     Plus,
-    QuestionMark,
     SemiColon,
     SingleQuote,
-    Tilde,
     Whitespace,
     Underscore,
     LineComment,
@@ -41,6 +36,7 @@ pub enum TokenType {
     String(StringToken),
     Identifier(String),
     EscapedIdentifier(String),
+    CatchAll(String),
 }
 
 #[derive(Debug, Clone)]
@@ -73,14 +69,13 @@ impl TokenType {
 impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match &self {
-            TokenType::Ampersand => "&",
             TokenType::And => "&&",
-            TokenType::AppendOutput => ">>",
             TokenType::Asterisk => "*",
             TokenType::Carat => "^",
             TokenType::CloseBraces => "}",
             TokenType::CloseParen => ")",
             TokenType::Comma => ",",
+            TokenType::BackSlash => "\\",
             TokenType::Dot => ".",
             TokenType::DoubleEquals => "==",
             TokenType::EOF => "EOF",
@@ -88,7 +83,6 @@ impl std::fmt::Display for TokenType {
             TokenType::ForwardSlash => "/",
             TokenType::Ge => ">=",
             TokenType::GreaterThan => ">",
-            TokenType::HereDocument => "<<",
             TokenType::OpenSqBracket => "[",
             TokenType::CloseSqBracket => "]",
             TokenType::Le => "<=",
@@ -100,12 +94,9 @@ impl std::fmt::Display for TokenType {
             TokenType::OpenBraces => "{",
             TokenType::OpenParen => "(",
             TokenType::Or => "||",
-            TokenType::Pipe => "|",
             TokenType::Plus => "+",
-            TokenType::QuestionMark => "?",
             TokenType::SemiColon => ";",
             TokenType::SingleQuote => "'",
-            TokenType::Tilde => "~",
             TokenType::Whitespace => " ",
             TokenType::Underscore => "_",
             TokenType::LineComment => "",
@@ -114,6 +105,7 @@ impl std::fmt::Display for TokenType {
             TokenType::Decimal(d) => return write!(f, "{}", d),
             TokenType::Identifier(s) => return write!(f, "{}", s),
             TokenType::String(s) => return write!(f, "{}{}{}", s.quote, s.value, s.quote),
+            TokenType::CatchAll(s) => s.as_str(),
         };
 
         write!(f, "{}", s)

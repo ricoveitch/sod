@@ -103,7 +103,7 @@ impl Parser {
         }
 
         if expected_token != &self.curr_token {
-            panic!("unexpected token '{}'", self.curr_token)
+            panic!("unexpected token '{}'", expected_token)
         }
 
         let previous_token = self.curr_token.clone();
@@ -513,14 +513,21 @@ impl Parser {
      */
     fn command(&mut self, cmd: String) -> ASTNode {
         let mut tokens = vec![ASTNode::String(cmd)];
+
+        let mut prev = self.curr_token.clone();
         self.advance_cmd_token();
 
-        while !self.curr_token.is_end_line() {
+        loop {
+            if self.curr_token.is_end_line() && prev != TokenType::BackSlash {
+                break;
+            }
+
             let node = match &self.curr_token {
                 TokenType::EscapedIdentifier(ident) => ASTNode::Identifier(ident.to_string()),
                 t => ASTNode::String(t.to_string()),
             };
 
+            prev = self.curr_token.clone();
             self.advance_cmd_token();
             tokens.push(node);
         }
