@@ -103,7 +103,7 @@ impl Parser {
         }
 
         if expected_token != &self.curr_token {
-            panic!("unexpected token '{}'", expected_token)
+            panic!("unexpected token '{}'", self.curr_token)
         }
 
         let previous_token = self.curr_token.clone();
@@ -427,7 +427,10 @@ impl Parser {
                 self.advance_token();
                 return self.call_expression(ASTNode::Identifier(ident));
             }
-            TokenType::OpenSqBracket | TokenType::Dot => return self.member_expression(),
+            TokenType::OpenSqBracket | TokenType::Dot => {
+                self.advance_token();
+                return self.member_expression(ASTNode::Identifier(ident));
+            }
             _ => (),
         };
 
@@ -454,10 +457,8 @@ impl Parser {
     /**
      * identifier member_prefix_expression
      */
-    fn member_expression(&mut self) -> ASTNode {
-        let ident = self.eat_identifier();
-        let mut base = ASTNode::Identifier(ident);
-
+    fn member_expression(&mut self, base: ASTNode) -> ASTNode {
+        let mut base = base;
         loop {
             let (new_base, more) = self.member_prefix_expression(base);
             base = new_base;
@@ -586,15 +587,21 @@ impl Parser {
         let args = self.call_expression_args();
         self.eat(&TokenType::CloseParen);
 
-        ASTNode::CallExpression(CallExpression {
+        let call_expression = ASTNode::CallExpression(CallExpression {
             base: Box::new(base),
             args,
-        })
+        });
+
+        if self.curr_token == TokenType::Dot {
+            return self.member_expression(call_expression);
+        }
+
+        call_expression
     }
 
     /**
      * call_expression_args
-     *   = "(" ((identifier | LITERAL),)* ")"
+     *   = "(" (expression,)* ")"
      */
     fn call_expression_args(&mut self) -> Vec<ASTNode> {
         if self.curr_token == TokenType::CloseParen {
@@ -603,11 +610,7 @@ impl Parser {
 
         let mut args = vec![];
         loop {
-            let node = match &self.curr_token {
-                TokenType::Identifier(_) => ASTNode::Identifier(self.eat_identifier()),
-                _ => self.eat_literal(),
-            };
-            args.push(node);
+            args.push(self.expression(0));
 
             if self.curr_token == TokenType::CloseParen {
                 break;

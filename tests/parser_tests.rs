@@ -38,6 +38,19 @@ fn functions() {
         "x = 1\nfunc foo(a,b) {\ny = 4\nreturn y + a + b + x\n}\nfoo(x, 100)",
         Symbol::Number(106.0),
     );
+    assert_expr(
+        r#"
+func get() {
+  return 1
+}
+func foo(val1, val2, val3) {
+ return echo $val1 $val2 $val3
+}
+
+foo(true, "pip", get()).trim()
+    "#,
+        new_string_symbol!("true pip 1".to_string()),
+    )
 }
 
 #[test]

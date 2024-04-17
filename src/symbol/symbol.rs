@@ -193,6 +193,18 @@ impl StringSymbol {
         new_string_symbol!(trimmed.to_string())
     }
 
+    pub fn contains(&self, args: Vec<Symbol>) -> Symbol {
+        if args.len() != 1 {
+            panic!("expected 1 arguments to contains, found {}", args.len())
+        }
+
+        let needle = match &args[0] {
+            Symbol::String(ss) => &ss.value,
+            _ => panic!(""),
+        };
+        Symbol::Boolean(self.value.contains(needle))
+    }
+
     pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Option<Symbol> {
         match fname {
             "insert" => {
@@ -323,12 +335,22 @@ impl List {
         self.items.insert(index, symbol);
     }
 
+    pub fn contains(&self, args: Vec<Symbol>) -> Symbol {
+        if args.len() != 1 {
+            panic!("expected 1 arguments to contains, found {}", args.len())
+        }
+
+        let symbol = &args[0];
+        Symbol::Boolean(self.items.contains(symbol))
+    }
+
     pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Option<Symbol> {
         match fname {
             "len" => Some(self.len()),
             "pop" => self.pop(),
             "push" => Some(self.push(args)),
             "remove" => Some(self.remove(args)),
+            "contains" => Some(self.contains(args)),
             "insert" => {
                 self.insert(args);
                 None
@@ -459,6 +481,22 @@ impl std::fmt::Display for Symbol {
 }
 
 impl Symbol {
+    pub fn call(&mut self, call: &str, args: Vec<Symbol>) -> Option<Self> {
+        match self {
+            Symbol::List(list) => list.call(call, args),
+            Symbol::String(ss) => ss.call(call, args),
+            _ => panic!("{} has no member {}", self.kind(), call),
+        }
+    }
+
+    pub fn get_index_mut(&mut self, index: usize) -> &mut Self {
+        match self {
+            Symbol::List(list) => list.get_mut(index),
+            Symbol::String(_) => unimplemented!("mutable index access for strings"),
+            _ => panic!("object is not indexable"),
+        }
+    }
+
     pub fn is_truthy(&self) -> bool {
         match self {
             Symbol::Number(n) => *n != 0.0,

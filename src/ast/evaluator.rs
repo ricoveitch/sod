@@ -10,6 +10,11 @@ use crate::symbol::scope::ScopeKind;
 use crate::symbol::symbol::{self, List, Range, Symbol};
 use crate::symbol::table::SymbolTable;
 
+enum SymbolRef<'a> {
+    MutRef(&'a mut Symbol),
+    Value(Symbol),
+}
+
 pub struct ASTEvaluator {
     symbol_table: SymbolTable,
 }
@@ -79,10 +84,16 @@ impl ASTEvaluator {
         }
     }
 
-    fn visit_node_mut(&mut self, node: ASTNode) -> &mut Symbol {
+    fn visit_node_mut(&mut self, node: ASTNode) -> SymbolRef {
         match node {
-            ASTNode::MemberExpression(me) => self.visit_member_expression_mut(me),
-            ASTNode::Identifier(ident) => self.get_symbol_mut(&ident),
+            ASTNode::MemberExpression(me) => {
+                SymbolRef::MutRef(self.visit_member_expression_mut(me))
+            }
+            ASTNode::Identifier(ident) => SymbolRef::MutRef(self.get_symbol_mut(&ident)),
+            ASTNode::CallExpression(ce) => match self.eval_call_expression(ce) {
+                Some(value) => SymbolRef::Value(value),
+                None => panic!("call has no value"),
+            },
             _ => panic!("not mutable"),
         }
     }
@@ -264,12 +275,10 @@ impl ASTEvaluator {
     ) -> Option<Symbol> {
         let args = self.visit_function_args(ast_args);
         let call = member_expr.property.as_str();
-        let symbol = self.visit_node_mut(*member_expr.base);
 
-        match symbol {
-            Symbol::List(list) => list.call(call, args),
-            Symbol::String(ss) => ss.call(call, args),
-            _ => panic!("{} has no member {}", symbol.kind(), call),
+        match self.visit_node_mut(*member_expr.base) {
+            SymbolRef::MutRef(symbol) => symbol.call(call, args),
+            SymbolRef::Value(mut symbol) => symbol.call(call, args),
         }
     }
 
@@ -309,12 +318,10 @@ impl ASTEvaluator {
 
     fn visit_index_expression_mut(&mut self, index_expr: IndexExpression) -> &mut Symbol {
         let index = self.eval_index(*index_expr.index);
-        let symbol = self.visit_node_mut(*index_expr.base);
-
-        match symbol {
-            Symbol::List(list) => list.get_mut(index),
-            Symbol::String(_) => unimplemented!("mutable index access for strings"),
-            _ => panic!("object is not indexable"),
+        match self.visit_node_mut(*index_expr.base) {
+            SymbolRef::MutRef(mr) => mr.get_index_mut(index),
+            //SymbolRef::Value(mut val) => val.get_index_mut(index),
+            _ => unimplemented!("by value index mutation"),
         }
     }
 
