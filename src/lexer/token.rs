@@ -33,28 +33,11 @@ pub enum TokenType {
     LineComment,
     Integer(usize),
     Decimal(f64),
-    String(StringToken),
+    String(String),
+    TemplateString(String),
     Identifier(String),
     EscapedIdentifier(String),
     CatchAll(String),
-}
-
-#[derive(Debug, Clone)]
-pub struct StringToken {
-    pub value: String,
-    pub quote: char,
-}
-
-impl PartialEq for StringToken {
-    fn eq(&self, other: &Self) -> bool {
-        self.to_string() == other.to_string()
-    }
-}
-
-impl ToString for StringToken {
-    fn to_string(&self) -> String {
-        format!("{}{}{}", self.quote, self.value, self.quote)
-    }
 }
 
 impl TokenType {
@@ -104,7 +87,8 @@ impl std::fmt::Display for TokenType {
             TokenType::Integer(i) => return write!(f, "{}", i),
             TokenType::Decimal(d) => return write!(f, "{}", d),
             TokenType::Identifier(s) => return write!(f, "{}", s),
-            TokenType::String(s) => return write!(f, "{}{}{}", s.quote, s.value, s.quote),
+            TokenType::String(s) => return write!(f, "'{}'", s),
+            TokenType::TemplateString(s) => return write!(f, r#""{}""#, s),
             TokenType::CatchAll(s) => s.as_str(),
         };
 

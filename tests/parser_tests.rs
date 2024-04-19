@@ -160,6 +160,15 @@ x + "bar"
             new_string_symbol!("zb".to_string()),
         ],
     );
+    assert_expr(
+        r#"x = "foo"
+"$x bar""#,
+        new_string_symbol!("foo bar".to_string()),
+    );
+    assert_expr(
+        "x = 'foo'\n'$x bar",
+        new_string_symbol!("$x bar".to_string()),
+    );
 }
 
 #[test]

@@ -5,7 +5,7 @@ use crate::{
     ast::ast::{
         self, ASTNode, BinaryExpression, BlockStatement, CallExpression, ForStatement,
         FunctionStatement, IfStatement, IndexExpression, MemberExpression, RangeExpression,
-        VariableExpression,
+        TemplateString, TemplateToken, VariableExpression,
     },
     common::bash,
     lexer::{lexer, token::TokenType},
@@ -51,7 +51,8 @@ impl Parser {
         let node = match &self.curr_token {
             TokenType::Decimal(dec) => ASTNode::Number(*dec),
             TokenType::Integer(int) => ASTNode::Number(*int as f64),
-            TokenType::String(s) => ASTNode::String(s.value.to_string()),
+            TokenType::String(s) => ASTNode::String(s.to_string()),
+            TokenType::TemplateString(ts) => self.read_template_string(ts.as_str()),
             _ => panic!("unexpected token {}", self.curr_token),
         };
 
@@ -525,6 +526,7 @@ impl Parser {
 
             let node = match &self.curr_token {
                 TokenType::EscapedIdentifier(ident) => ASTNode::Identifier(ident.to_string()),
+                TokenType::TemplateString(s) => self.read_template_string(s.as_str()),
                 t => ASTNode::String(t.to_string()),
             };
 
@@ -629,5 +631,32 @@ impl Parser {
     fn unary_expression(&mut self) -> ASTNode {
         self.eat(&TokenType::Minus);
         ASTNode::UnaryExpression(Box::new(self.expression(4)))
+    }
+
+    fn read_template_string(&self, value: &str) -> ASTNode {
+        let mut tokens = vec![];
+
+        let mut tail = 0;
+        while tail < value.len() {
+            if value.chars().nth(tail).unwrap() == '$' {
+                tail += 1;
+                let head = tail;
+                while tail < value.len() && value.chars().nth(tail).unwrap() != ' ' {
+                    tail += 1;
+                }
+                if tail == head {
+                    panic!("invalid template string - expected expression after '$'")
+                }
+                tokens.push(TemplateToken::Expression(value[head..tail].to_string()))
+            } else {
+                let head = tail;
+                while tail < value.len() && value.chars().nth(tail).unwrap() != '$' {
+                    tail += 1;
+                }
+                tokens.push(TemplateToken::Literal(value[head..tail].to_string()))
+            }
+        }
+
+        ASTNode::TemplateString(TemplateString { tokens })
     }
 }

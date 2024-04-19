@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use super::token::{StringToken, TokenType};
+use super::token::TokenType;
 use crate::common::utils;
 
 pub struct Lexer {
@@ -143,17 +143,16 @@ impl Lexer {
         }
     }
 
-    fn read_string(&self, term: u8) -> (TokenType, usize) {
-        let (s_bytes, s_bytes_read) = self.read_while(|b| *b != term, 1);
+    fn read_string(&self, quote: u8) -> (TokenType, usize) {
+        let (s_bytes, inner_bytes_read) = self.read_while(|b| *b != quote, 1);
         let s = utils::bytes_to_string(s_bytes);
+        let bytes_read = inner_bytes_read + 2;
 
-        (
-            TokenType::String(StringToken {
-                value: s,
-                quote: term as char,
-            }),
-            s_bytes_read + 2,
-        )
+        if quote == b'"' {
+            return (TokenType::TemplateString(s), bytes_read);
+        }
+
+        (TokenType::String(s), bytes_read)
     }
 
     fn read_escaped_identifier(&self) -> (TokenType, usize) {

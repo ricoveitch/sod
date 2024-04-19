@@ -12,7 +12,11 @@ output"#,
         new_string_symbol!("gear.tmp\n".to_string()),
     );
 
-    assert_expr(r#"echo "$FOOBAR""#, new_string_symbol!("\n".to_string()));
+    assert_expr(
+        r#"x = "foo"
+echo "$x""#,
+        new_string_symbol!("foo\n".to_string()),
+    );
     assert_expr(
         "echo '# $FOOBAR'",
         new_string_symbol!("# $FOOBAR\n".to_string()),

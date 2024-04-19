@@ -1,7 +1,7 @@
 use super::ast::{
     self, ASTNode, BinaryExpression, BlockStatement, CallExpression, ForStatement,
     FunctionStatement, IfStatement, IndexExpression, MemberExpression, RangeExpression,
-    VariableExpression,
+    TemplateString, VariableExpression,
 };
 use crate::common::bash;
 use crate::lexer::token::TokenType;
@@ -71,6 +71,7 @@ impl ASTEvaluator {
             ASTNode::Number(value) => Some(Symbol::Number(value)),
             ASTNode::Boolean(value) => Some(Symbol::Boolean(value)),
             ASTNode::String(value) => Some(new_string_symbol!(value)),
+            ASTNode::TemplateString(ts) => Some(self.visit_template_string(ts)),
             ASTNode::List(nodes) => Some(self.eval_list(*nodes)),
             ASTNode::None => Some(Symbol::None),
             ASTNode::RangeExpression(range_expr) => {
@@ -114,6 +115,22 @@ impl ASTEvaluator {
                 panic!("'{}' is not defined", name);
             }
         }
+    }
+
+    fn visit_template_string(&self, template_string: TemplateString) -> Symbol {
+        let mut res = "".to_string();
+        for token in template_string.tokens {
+            let sub_str = match token {
+                ast::TemplateToken::Expression(expr) => {
+                    let symbol = self.get_symbol(expr.as_str());
+                    symbol.to_string()
+                }
+                ast::TemplateToken::Literal(s) => s,
+            };
+            res.push_str(sub_str.as_str());
+        }
+
+        new_string_symbol!(res)
     }
 
     fn visit_range_expression(&mut self, range_expr: RangeExpression) -> Range {

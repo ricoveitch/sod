@@ -1,5 +1,5 @@
 use orca::lexer::lexer::Lexer;
-use orca::lexer::token::{StringToken, TokenType};
+use orca::lexer::token::TokenType;
 
 fn assert_tokens(mut l: Lexer, expected: Vec<TokenType>, cmd: bool) {
     let mut next = || {
@@ -64,10 +64,7 @@ fn strings() {
         vec![
             TokenType::Identifier("x".to_string()),
             TokenType::Equals,
-            TokenType::String(StringToken {
-                value: "foo".to_string(),
-                quote: '\"',
-            }),
+            TokenType::TemplateString("foo".to_string()),
         ],
         false,
     );

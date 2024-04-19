@@ -22,11 +22,23 @@ pub enum ASTNode {
     Number(f64),
     Boolean(bool),
     String(String),
+    TemplateString(TemplateString),
     Identifier(String),
     None,
     List(Box<Vec<ASTNode>>),
 
     Command(Box<Vec<ASTNode>>),
+}
+
+#[derive(Debug, Clone)]
+pub struct TemplateString {
+    pub tokens: Vec<TemplateToken>,
+}
+
+#[derive(Debug, Clone)]
+pub enum TemplateToken {
+    Expression(String),
+    Literal(String),
 }
 
 #[derive(Debug, Clone)]
