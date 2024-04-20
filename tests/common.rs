@@ -5,8 +5,8 @@ pub mod utils {
 
     pub fn eval_expr(expr: &str) -> Vec<Option<Symbol>> {
         let mut evaluator = ASTEvaluator::new(vec![]);
-        let program = Parser::new(expr).parse();
-        evaluator.eval(program)
+        let program = Parser::new(expr).parse().unwrap();
+        evaluator.eval(program).unwrap()
     }
 
     pub fn assert_expr(expr: &str, expected: Symbol) {
@@ -19,8 +19,8 @@ pub mod utils {
     pub fn assert_exprs(exprs: Vec<&str>, expected: Vec<Symbol>) {
         let mut evaluator = ASTEvaluator::new(vec![]);
         for (expr, expected) in exprs.iter().zip(expected.iter()) {
-            let program = Parser::new(expr).parse();
-            let evaluation = evaluator.eval(program);
+            let program = Parser::new(expr).parse().unwrap();
+            let evaluation = evaluator.eval(program).unwrap();
             let symbol = evaluation.last().unwrap().as_ref().unwrap();
             assert_eq!(expected, symbol);
         }

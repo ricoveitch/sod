@@ -22,9 +22,19 @@ fn parse_file(env_args: Vec<String>) {
         }
     };
 
-    let ast = Parser::new(&src).parse();
+    let ast = match Parser::new(&src).parse() {
+        Ok(ast) => ast,
+        Err(e) => {
+            eprintln!("{}", e.to_string());
+            process::exit(1);
+        }
+    };
+
     let mut evaluator = ASTEvaluator::new(argv);
-    evaluator.eval(ast);
+    if let Err(e) = evaluator.eval(ast) {
+        eprintln!("{}", e);
+        process::exit(1);
+    }
 }
 
 fn interpret() {
@@ -36,8 +46,23 @@ fn interpret() {
         let mut buffer = String::new();
         io::stdin().read_line(&mut buffer).unwrap();
 
-        let program = Parser::new(&buffer).parse();
-        for option in evaluator.eval(program) {
+        let program = match Parser::new(&buffer).parse() {
+            Ok(prog) => prog,
+            Err(e) => {
+                eprintln!("{}", e);
+                continue;
+            }
+        };
+
+        let lines = match evaluator.eval(program) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("{}", e);
+                continue;
+            }
+        };
+
+        for option in lines {
             if let Some(value) = option {
                 println!("{}", value);
             }

@@ -1,7 +1,10 @@
 use std::error::Error;
 
 use super::token::TokenType;
-use crate::common::utils;
+
+pub fn bytes_to_string(bytes: Vec<u8>) -> String {
+    String::from_utf8_lossy(&bytes).to_string()
+}
 
 pub struct Lexer {
     src: Vec<u8>,
@@ -85,10 +88,7 @@ impl Lexer {
     fn read_identifier(&self) -> (TokenType, usize) {
         let (bytes, bytes_read) = self.read_while(|b| b.is_ascii_alphanumeric() || *b == b'_', 0);
 
-        (
-            TokenType::Identifier(utils::bytes_to_string(bytes)),
-            bytes_read,
-        )
+        (TokenType::Identifier(bytes_to_string(bytes)), bytes_read)
     }
 
     fn read_equals(&self) -> (TokenType, usize) {
@@ -145,7 +145,7 @@ impl Lexer {
 
     fn read_string(&self, quote: u8) -> (TokenType, usize) {
         let (s_bytes, inner_bytes_read) = self.read_while(|b| *b != quote, 1);
-        let s = utils::bytes_to_string(s_bytes);
+        let s = bytes_to_string(s_bytes);
         let bytes_read = inner_bytes_read + 2;
 
         if quote == b'"' {
@@ -157,12 +157,9 @@ impl Lexer {
 
     fn read_escaped_identifier(&self) -> (TokenType, usize) {
         let (bytes, bytes_read) = self.read_while(|b| b.is_ascii_alphanumeric(), 1);
-        if bytes_read == 0 {
-            panic!("expected a variable");
-        }
 
         (
-            TokenType::EscapedIdentifier(utils::bytes_to_string(bytes)),
+            TokenType::EscapedIdentifier(bytes_to_string(bytes)),
             bytes_read + 1,
         )
     }

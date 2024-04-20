@@ -40,15 +40,15 @@ fn functions() {
     );
     assert_expr(
         r#"
-func get() {
-  return 1
-}
-func foo(val1, val2, val3) {
- return echo $val1 $val2 $val3
-}
+    func get() {
+      return 1
+    }
+    func foo(val1, val2, val3) {
+     return echo $val1 $val2 $val3
+    }
 
-foo(true, "pip", get()).trim()
-    "#,
+    foo(true, "pip", get()).trim()
+        "#,
         new_string_symbol!("true pip 1".to_string()),
     )
 }

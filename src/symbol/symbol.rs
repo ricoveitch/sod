@@ -115,10 +115,10 @@ impl StringSymbol {
         Self { value: s }
     }
 
-    pub fn get(&self, index: usize) -> Symbol {
+    pub fn get(&self, index: usize) -> Result<Symbol, String> {
         match self.value.chars().nth(index) {
-            Some(c) => new_string_symbol!(c.to_string()),
-            None => panic!("string index out of range"),
+            Some(c) => Ok(new_string_symbol!(c.to_string())),
+            None => return Err(format!("string index out of range")),
         }
     }
 
@@ -126,44 +126,49 @@ impl StringSymbol {
         Symbol::Number(self.value.len() as f64)
     }
 
-    pub fn insert(&mut self, args: Vec<Symbol>) {
+    pub fn insert(&mut self, args: Vec<Symbol>) -> Result<(), String> {
         if args.len() != 2 {
-            panic!("expected 2 arguments to insert, found {}", args.len())
+            return Err(format!(
+                "expected 2 arguments to insert, found {}",
+                args.len()
+            ));
         }
 
         let index = match args.get(0).unwrap().to_owned() {
             Symbol::Number(index) => index as usize,
-            _ => panic!("string indexes must be of type number"),
+            _ => return Err(format!("string indexes must be of type number")),
         };
 
         if index > self.value.len() {
-            panic!("string insert index out of range");
+            return Err(format!("string insert index out of range"));
         }
 
         let string = match args.get(1).unwrap() {
             Symbol::String(s) => &s.value,
-            _ => panic!("can only insert string into a string"),
+            _ => return Err(format!("can only insert string into a string")),
         };
 
         self.value.insert_str(index, string.as_str());
+
+        Ok(())
     }
 
-    pub fn remove(&mut self, args: Vec<Symbol>) -> Symbol {
+    pub fn remove(&mut self, args: Vec<Symbol>) -> Result<Symbol, String> {
         if args.len() != 1 {
-            panic!("incorrect number of arguments to remove")
+            return Err(format!("incorrect number of arguments to remove"));
         }
 
         let index = match args.get(0).unwrap().to_owned() {
             Symbol::Number(index) => index as usize,
-            _ => panic!("string indexes must be of type number"),
+            _ => return Err(format!("string indexes must be of type number")),
         };
 
         if index > self.value.len() {
-            panic!("string remove index out of range");
+            return Err(format!("string remove index out of range"));
         }
 
         let removed = self.value.remove(index);
-        new_string_symbol!(removed.to_string())
+        Ok(new_string_symbol!(removed.to_string()))
     }
 
     pub fn pop(&mut self) -> Option<Symbol> {
@@ -174,18 +179,18 @@ impl StringSymbol {
         return None;
     }
 
-    pub fn push(&mut self, args: Vec<Symbol>) -> Symbol {
+    pub fn push(&mut self, args: Vec<Symbol>) -> Result<Symbol, String> {
         if args.len() != 1 {
-            panic!("incorrect number of arguments to push")
+            return Err(format!("incorrect number of arguments to push"));
         }
 
         let symbol = match args.get(0).unwrap() {
             Symbol::String(ss) => &ss.value,
-            _ => panic!("can only add a string to a string"),
+            _ => return Err(format!("can only add a string to a string")),
         };
 
         self.value.push_str(symbol);
-        self.len()
+        Ok(self.len())
     }
 
     fn trim(&mut self) -> Symbol {
@@ -193,31 +198,36 @@ impl StringSymbol {
         new_string_symbol!(trimmed.to_string())
     }
 
-    pub fn contains(&self, args: Vec<Symbol>) -> Symbol {
+    pub fn contains(&self, args: Vec<Symbol>) -> Result<Symbol, String> {
         if args.len() != 1 {
-            panic!("expected 1 arguments to contains, found {}", args.len())
+            return Err(format!(
+                "expected 1 arguments to contains, found {}",
+                args.len()
+            ));
         }
 
         let needle = match &args[0] {
             Symbol::String(ss) => &ss.value,
-            _ => panic!(""),
+            _ => return Err(format!("string contains expected a string")),
         };
-        Symbol::Boolean(self.value.contains(needle))
+        Ok(Symbol::Boolean(self.value.contains(needle)))
     }
 
-    pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Option<Symbol> {
-        match fname {
+    pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Result<Option<Symbol>, String> {
+        let option = match fname {
             "insert" => {
-                self.insert(args);
+                self.insert(args)?;
                 None
             }
-            "remove" => Some(self.remove(args)),
+            "remove" => Some(self.remove(args)?),
             "pop" => self.pop(),
             "len" => Some(self.len()),
-            "push" => Some(self.push(args)),
+            "push" => Some(self.push(args)?),
             "trim" => Some(self.trim()),
-            _ => panic!("string has no member '{}'", fname),
-        }
+            _ => return Err(format!("string has no member '{}'", fname)),
+        };
+
+        Ok(option)
     }
 }
 
@@ -276,186 +286,208 @@ impl List {
         self.items.pop()
     }
 
-    pub fn push(&mut self, args: Vec<Symbol>) -> Symbol {
+    pub fn push(&mut self, args: Vec<Symbol>) -> Result<Symbol, String> {
         if args.len() != 1 {
-            panic!("incorrect number of arguments to push")
+            return Err(format!("incorrect number of arguments to push"));
         }
 
         let symbol = args.get(0).unwrap().to_owned();
         self.items.push(symbol);
-        self.len()
+        Ok(self.len())
     }
 
-    pub fn get_mut(&mut self, index: usize) -> &mut Symbol {
+    pub fn get_mut(&mut self, index: usize) -> Result<&mut Symbol, String> {
         match self.items.get_mut(index) {
-            Some(s) => s,
-            None => panic!("list index out of range"),
+            Some(s) => Ok(s),
+            None => Err(format!("list index out of range")),
         }
     }
 
-    pub fn get(&self, index: usize) -> &Symbol {
+    pub fn get(&self, index: usize) -> Result<&Symbol, String> {
         match self.items.get(index) {
-            Some(s) => s,
-            None => panic!("list index out of range"),
+            Some(s) => Ok(s),
+            None => Err(format!("list index out of range")),
         }
     }
 
-    pub fn remove(&mut self, args: Vec<Symbol>) -> Symbol {
+    pub fn remove(&mut self, args: Vec<Symbol>) -> Result<Symbol, String> {
         if args.len() != 1 {
-            panic!("incorrect number of arguments to remove")
+            return Err(format!("incorrect number of arguments to remove"));
         }
 
         let index = match args.get(0).unwrap().to_owned() {
             Symbol::Number(index) => index as usize,
-            _ => panic!("list indexes must be of type number"),
+            _ => return Err(format!("list indexes must be of type number")),
         };
 
         if index > self.items.len() {
-            panic!("list remove index out of range");
+            return Err(format!("list remove index out of range"));
         }
 
-        self.items.remove(index)
+        Ok(self.items.remove(index))
     }
 
-    pub fn insert(&mut self, args: Vec<Symbol>) {
+    pub fn insert(&mut self, args: Vec<Symbol>) -> Result<(), String> {
         if args.len() != 2 {
-            panic!("expected 2 arguments to insert, found {}", args.len())
+            return Err(format!(
+                "expected 2 arguments to insert, found {}",
+                args.len()
+            ));
         }
 
         let index = match args.get(0).unwrap().to_owned() {
             Symbol::Number(index) => index as usize,
-            _ => panic!("list indexes must be of type number"),
+            _ => return Err(format!("list indexes must be of type number")),
         };
 
         if index > self.items.len() {
-            panic!("list insert index out of range");
+            return Err(format!("list insert index out of range"));
         }
 
         let symbol = args.get(1).unwrap().to_owned();
         self.items.insert(index, symbol);
+        Ok(())
     }
 
-    pub fn contains(&self, args: Vec<Symbol>) -> Symbol {
+    pub fn contains(&self, args: Vec<Symbol>) -> Result<Symbol, String> {
         if args.len() != 1 {
-            panic!("expected 1 arguments to contains, found {}", args.len())
+            return Err(format!(
+                "expected 1 arguments to contains, found {}",
+                args.len()
+            ));
         }
 
         let symbol = &args[0];
-        Symbol::Boolean(self.items.contains(symbol))
+        Ok(Symbol::Boolean(self.items.contains(symbol)))
     }
 
-    pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Option<Symbol> {
-        match fname {
+    pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Result<Option<Symbol>, String> {
+        let option = match fname {
             "len" => Some(self.len()),
             "pop" => self.pop(),
-            "push" => Some(self.push(args)),
-            "remove" => Some(self.remove(args)),
-            "contains" => Some(self.contains(args)),
+            "push" => Some(self.push(args)?),
+            "remove" => Some(self.remove(args)?),
+            "contains" => Some(self.contains(args)?),
             "insert" => {
-                self.insert(args);
+                self.insert(args)?;
                 None
             }
-            _ => panic!("list has no member '{}'", fname),
-        }
+            _ => return Err(format!("list has no member '{}'", fname)),
+        };
+
+        Ok(option)
     }
 }
 
-fn compare_literal<T>(left: &T, operator: &TokenType, right: &T) -> bool
+fn compare_literal<T>(left: &T, operator: &TokenType, right: &T) -> Result<bool, String>
 where
     T: std::cmp::PartialEq + std::cmp::PartialOrd + std::fmt::Display,
 {
-    match operator {
+    let b = match operator {
         TokenType::GreaterThan => left > right,
         TokenType::LessThan => left < right,
         TokenType::Ge => left >= right,
         TokenType::Le => left <= right,
-        _ => panic!(
-            "{} {} {}: unable to compare booleans",
-            left, operator, right
-        ),
-    }
+        _ => {
+            return Err(format!(
+                "{} {} {}: unable to compare literals",
+                left, operator, right
+            ))
+        }
+    };
+
+    Ok(b)
 }
 
-fn compare_relational(left: &Symbol, op: &TokenType, right: &Symbol) -> bool {
+fn compare_relational(left: &Symbol, op: &TokenType, right: &Symbol) -> Result<bool, String> {
     match (left, right) {
         (Symbol::Number(lv), Symbol::Number(rv)) => compare_literal(lv, op, rv),
         (Symbol::Boolean(lv), Symbol::Boolean(rv)) => compare_literal(lv, op, rv),
         (Symbol::String(lv), Symbol::String(rv)) => compare_literal(&lv.value, op, &rv.value),
-        _ => panic!("type mismatch: {} > {}", left, right),
+        _ => Err(format!("type mismatch: {} {} {}", left, op, right)),
     }
 }
 
-pub fn eval_binary_expression(left: &Symbol, operator: &TokenType, right: &Symbol) -> Symbol {
+pub fn eval_binary_expression(
+    left: &Symbol,
+    operator: &TokenType,
+    right: &Symbol,
+) -> Result<Symbol, String> {
     match operator {
         TokenType::Plus => left + right,
         TokenType::Minus => left - right,
         TokenType::Asterisk => left * right,
         TokenType::ForwardSlash => left / right,
         TokenType::Carat => match (left, right) {
-            (Symbol::Number(ln), Symbol::Number(rn)) => Symbol::Number(ln.powf(*rn)),
-            _ => panic!("can't raise the power of non-number ({}^{})", left, right),
+            (Symbol::Number(ln), Symbol::Number(rn)) => Ok(Symbol::Number(ln.powf(*rn))),
+            _ => {
+                return Err(format!(
+                    "can't raise the power of non-number ({}^{})",
+                    left, right
+                ))
+            }
         },
-        TokenType::DoubleEquals => Symbol::Boolean(left == right),
-        TokenType::NotEquals => Symbol::Boolean(left != right),
-        TokenType::And => right.clone(),
+        TokenType::DoubleEquals => Ok(Symbol::Boolean(left == right)),
+        TokenType::NotEquals => Ok(Symbol::Boolean(left != right)),
+        TokenType::And => Ok(right.clone()),
         TokenType::Or => {
             if left.is_truthy() {
-                left.clone()
+                Ok(left.clone())
             } else {
-                right.clone()
+                Ok(right.clone())
             }
         }
         TokenType::GreaterThan | TokenType::LessThan | TokenType::Ge | TokenType::Le => {
-            Symbol::Boolean(compare_relational(left, operator, right))
+            Ok(Symbol::Boolean(compare_relational(left, operator, right)?))
         }
-        _ => panic!("unsupported operator {}", operator),
+        _ => return Err(format!("unsupported operator {}", operator)),
     }
 }
 
 impl std::ops::Add for &Symbol {
-    type Output = Symbol;
+    type Output = Result<Symbol, String>;
 
-    fn add(self, rhs: Self) -> Symbol {
+    fn add(self, rhs: Self) -> Result<Symbol, String> {
         match (self, rhs) {
-            (Symbol::Number(lv), Symbol::Number(rv)) => Symbol::Number(lv + rv),
+            (Symbol::Number(lv), Symbol::Number(rv)) => Ok(Symbol::Number(lv + rv)),
             (Symbol::String(lv), Symbol::String(rv)) => {
                 let value = format!("{}{}", lv.value, rv.value);
-                new_string_symbol!(value)
+                Ok(new_string_symbol!(value))
             }
-            _ => panic!("unsupported operand type for {} + {}", self, rhs),
+            _ => Err(format!("unsupported operand type for {} + {}", self, rhs)),
         }
     }
 }
 
 impl std::ops::Sub for &Symbol {
-    type Output = Symbol;
+    type Output = Result<Symbol, String>;
 
-    fn sub(self, rhs: Self) -> Symbol {
+    fn sub(self, rhs: Self) -> Result<Symbol, String> {
         match (self, rhs) {
-            (Symbol::Number(lv), Symbol::Number(rv)) => Symbol::Number(lv - rv),
-            _ => panic!("unsupported operand type for {} - {}", self, rhs),
+            (Symbol::Number(lv), Symbol::Number(rv)) => Ok(Symbol::Number(lv - rv)),
+            _ => Err(format!("unsupported operand type for {} - {}", self, rhs)),
         }
     }
 }
 
 impl std::ops::Mul for &Symbol {
-    type Output = Symbol;
+    type Output = Result<Symbol, String>;
 
-    fn mul(self, rhs: Self) -> Symbol {
+    fn mul(self, rhs: Self) -> Result<Symbol, String> {
         match (self, rhs) {
-            (Symbol::Number(lv), Symbol::Number(rv)) => Symbol::Number(lv * rv),
-            _ => panic!("unsupported operand type for {} * {}", self, rhs),
+            (Symbol::Number(lv), Symbol::Number(rv)) => Ok(Symbol::Number(lv * rv)),
+            _ => Err(format!("unsupported operand type for {} * {}", self, rhs)),
         }
     }
 }
 
 impl std::ops::Div for &Symbol {
-    type Output = Symbol;
+    type Output = Result<Symbol, String>;
 
-    fn div(self, rhs: Self) -> Symbol {
+    fn div(self, rhs: Self) -> Result<Symbol, String> {
         match (self, rhs) {
-            (Symbol::Number(lv), Symbol::Number(rv)) => Symbol::Number(lv / rv),
-            _ => panic!("unsupported operand type for {} / {}", self, rhs),
+            (Symbol::Number(lv), Symbol::Number(rv)) => Ok(Symbol::Number(lv / rv)),
+            _ => Err(format!("unsupported operand type for {} / {}", self, rhs)),
         }
     }
 }
@@ -481,19 +513,19 @@ impl std::fmt::Display for Symbol {
 }
 
 impl Symbol {
-    pub fn call(&mut self, call: &str, args: Vec<Symbol>) -> Option<Self> {
+    pub fn call(&mut self, call: &str, args: Vec<Symbol>) -> Result<Option<Self>, String> {
         match self {
             Symbol::List(list) => list.call(call, args),
             Symbol::String(ss) => ss.call(call, args),
-            _ => panic!("{} has no member {}", self.kind(), call),
+            _ => Err(format!("{} has no member {}", self.kind(), call)),
         }
     }
 
-    pub fn get_index_mut(&mut self, index: usize) -> &mut Self {
+    pub fn get_index_mut(&mut self, index: usize) -> Result<&mut Self, String> {
         match self {
             Symbol::List(list) => list.get_mut(index),
             Symbol::String(_) => unimplemented!("mutable index access for strings"),
-            _ => panic!("object is not indexable"),
+            _ => Err(format!("object is not indexable")),
         }
     }
 
