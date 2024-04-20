@@ -6,7 +6,7 @@ use crate::{
         FunctionStatement, IfStatement, IndexExpression, MemberExpression, RangeExpression,
         TemplateString, TemplateToken, VariableExpression,
     },
-    common::bash,
+    commands,
     lexer::{lexer, token::TokenType},
 };
 
@@ -23,7 +23,7 @@ impl Parser {
         Parser {
             lexer,
             curr_token,
-            commands: bash::get_commands(),
+            commands: commands::get_commands(),
         }
     }
 

@@ -3,7 +3,7 @@ use super::ast::{
     FunctionStatement, IfStatement, IndexExpression, MemberExpression, RangeExpression,
     TemplateString, VariableExpression,
 };
-use crate::common::bash;
+use crate::commands;
 use crate::lexer::token::TokenType;
 use crate::new_string_symbol;
 use crate::symbol::scope::ScopeKind;
@@ -221,7 +221,7 @@ impl ASTEvaluator {
             }
         }
 
-        let output = bash::run_cmd(&cmd_string);
+        let output = commands::run_cmd(&cmd_string);
         print!("{}", output);
         Ok(new_string_symbol!(output))
     }
