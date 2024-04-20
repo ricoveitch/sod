@@ -1,5 +1,5 @@
-use orca::ast::evaluator::ASTEvaluator;
-use orca::parser::Parser;
+use sod::ast::evaluator::ASTEvaluator;
+use sod::parser::Parser;
 use std::env;
 use std::fs;
 use std::io::{self, Write};

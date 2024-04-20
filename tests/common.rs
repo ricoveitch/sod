@@ -1,7 +1,7 @@
 pub mod utils {
-    use orca::ast::evaluator::ASTEvaluator;
-    use orca::parser::Parser;
-    use orca::symbol::symbol::Symbol;
+    use sod::ast::evaluator::ASTEvaluator;
+    use sod::parser::Parser;
+    use sod::symbol::symbol::Symbol;
 
     pub fn eval_expr(expr: &str) -> Vec<Option<Symbol>> {
         let mut evaluator = ASTEvaluator::new(vec![]);

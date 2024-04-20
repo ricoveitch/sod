@@ -1,5 +1,5 @@
-use orca::lexer::lexer::Lexer;
-use orca::lexer::token::TokenType;
+use sod::lexer::lexer::Lexer;
+use sod::lexer::token::TokenType;
 
 fn assert_tokens(mut l: Lexer, expected: Vec<TokenType>, cmd: bool) {
     let mut next = || {

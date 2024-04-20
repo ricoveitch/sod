@@ -1,6 +1,6 @@
 use common::utils::{assert_expr, assert_exprs, eval_expr};
-use orca::new_string_symbol;
-use orca::symbol::symbol::Symbol;
+use sod::new_string_symbol;
+use sod::symbol::symbol::Symbol;
 mod common;
 
 #[test]

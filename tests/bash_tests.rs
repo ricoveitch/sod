@@ -1,5 +1,5 @@
 use common::utils::assert_expr;
-use orca::new_string_symbol;
+use sod::new_string_symbol;
 
 mod common;
 
