@@ -171,12 +171,12 @@ impl StringSymbol {
         Ok(new_string_symbol!(removed.to_string()))
     }
 
-    pub fn pop(&mut self) -> Option<Symbol> {
+    pub fn pop(&mut self) -> Symbol {
         if let Some(popped) = self.value.pop() {
-            return Some(new_string_symbol!(popped.to_string()));
+            return new_string_symbol!(popped.to_string());
         }
 
-        return None;
+        return Symbol::None;
     }
 
     pub fn push(&mut self, args: Vec<Symbol>) -> Result<Symbol, String> {
@@ -213,17 +213,17 @@ impl StringSymbol {
         Ok(Symbol::Boolean(self.value.contains(needle)))
     }
 
-    pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Result<Option<Symbol>, String> {
+    pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Result<Symbol, String> {
         let option = match fname {
             "insert" => {
                 self.insert(args)?;
-                None
+                Symbol::None
             }
-            "remove" => Some(self.remove(args)?),
+            "remove" => self.remove(args)?,
             "pop" => self.pop(),
-            "len" => Some(self.len()),
-            "push" => Some(self.push(args)?),
-            "trim" => Some(self.trim()),
+            "len" => self.len(),
+            "push" => self.push(args)?,
+            "trim" => self.trim(),
             _ => return Err(format!("string has no member '{}'", fname)),
         };
 
@@ -282,8 +282,11 @@ impl List {
         Symbol::Number(self.items.len() as f64)
     }
 
-    pub fn pop(&mut self) -> Option<Symbol> {
-        self.items.pop()
+    pub fn pop(&mut self) -> Symbol {
+        if let Some(symbol) = self.items.pop() {
+            return symbol;
+        }
+        Symbol::None
     }
 
     pub fn push(&mut self, args: Vec<Symbol>) -> Result<Symbol, String> {
@@ -361,16 +364,16 @@ impl List {
         Ok(Symbol::Boolean(self.items.contains(symbol)))
     }
 
-    pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Result<Option<Symbol>, String> {
+    pub fn call(&mut self, fname: &str, args: Vec<Symbol>) -> Result<Symbol, String> {
         let option = match fname {
-            "len" => Some(self.len()),
+            "len" => self.len(),
             "pop" => self.pop(),
-            "push" => Some(self.push(args)?),
-            "remove" => Some(self.remove(args)?),
-            "contains" => Some(self.contains(args)?),
+            "push" => self.push(args)?,
+            "remove" => self.remove(args)?,
+            "contains" => self.contains(args)?,
             "insert" => {
                 self.insert(args)?;
-                None
+                Symbol::None
             }
             _ => return Err(format!("list has no member '{}'", fname)),
         };
@@ -502,7 +505,7 @@ impl std::fmt::Display for Symbol {
             Symbol::None => "none".to_string(),
             Symbol::List(list) => {
                 let items: Vec<String> = list.items.iter().map(|f| f.to_string()).collect();
-                format!("{:?}", items)
+                format!("[ {} ]", items.join(", "))
             }
             Symbol::Range(range) => format!("{}..{}..{}", range.start, range.end, range.increment),
             Symbol::Object(obj) => format!("{:?}", obj.mapping),
@@ -513,7 +516,7 @@ impl std::fmt::Display for Symbol {
 }
 
 impl Symbol {
-    pub fn call(&mut self, call: &str, args: Vec<Symbol>) -> Result<Option<Self>, String> {
+    pub fn call(&mut self, call: &str, args: Vec<Symbol>) -> Result<Self, String> {
         match self {
             Symbol::List(list) => list.call(call, args),
             Symbol::String(ss) => ss.call(call, args),

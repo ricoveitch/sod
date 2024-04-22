@@ -49,7 +49,16 @@ impl Parser {
     fn eat_literal(&mut self) -> Result<ASTNode, String> {
         let node = match &self.curr_token {
             TokenType::Decimal(dec) => ASTNode::Number(*dec),
-            TokenType::Integer(int) => ASTNode::Number(*int as f64),
+            TokenType::Integer(int) => {
+                let number = ASTNode::Number(*int as f64);
+                match self.lookahead(1) {
+                    TokenType::Dot => {
+                        self.advance_token();
+                        return Ok(ASTNode::RangeExpression(self.range_expression(number)?));
+                    }
+                    _ => number,
+                }
+            }
             TokenType::String(s) => ASTNode::String(s.to_string()),
             TokenType::TemplateString(ts) => self.read_template_string(ts.as_str()),
             _ => return Err(format!("unexpected token '{}'", self.curr_token)),
@@ -224,14 +233,9 @@ impl Parser {
     fn range_expression(&mut self, start: ASTNode) -> Result<RangeExpression, String> {
         self.eat(&TokenType::Dot)?;
         self.eat(&TokenType::Dot)?;
-        let end = self.expression(0)?;
-
-        let increment = if self.curr_token == TokenType::Dot {
-            self.eat(&TokenType::Dot)?;
-            self.eat(&TokenType::Dot)?;
-            Some(Box::new(self.expression(0)?))
-        } else {
-            None
+        let (end, increment) = match self.expression(0)? {
+            ASTNode::RangeExpression(re) => (*re.start, Some(Box::new(*re.end))),
+            node => (node, None),
         };
 
         Ok(RangeExpression {

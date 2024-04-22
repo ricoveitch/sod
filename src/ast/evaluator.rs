@@ -55,7 +55,7 @@ impl ASTEvaluator {
                     .set(&fs.name.clone(), Symbol::Function(Box::new(fs)));
                 None
             }
-            ASTNode::CallExpression(fc) => self.eval_call_expression(fc)?,
+            ASTNode::CallExpression(fc) => Some(self.eval_call_expression(fc)?),
             ASTNode::IfStatement(is) => {
                 self.eval_if_statement(is)?;
                 None
@@ -93,10 +93,7 @@ impl ASTEvaluator {
                 SymbolRef::MutRef(self.visit_member_expression_mut(me)?)
             }
             ASTNode::Identifier(ident) => SymbolRef::MutRef(self.get_symbol_mut(&ident)?),
-            ASTNode::CallExpression(ce) => match self.eval_call_expression(ce)? {
-                Some(value) => SymbolRef::Value(value),
-                None => return Err(format!("call has no value")),
-            },
+            ASTNode::CallExpression(ce) => SymbolRef::Value(self.eval_call_expression(ce)?),
             _ => return Err(format!("not mutable")),
         };
 
@@ -138,7 +135,11 @@ impl ASTEvaluator {
             match self.eval_node(node)? {
                 Some(symbol) => match symbol {
                     Symbol::Number(num) => Ok(num as i32),
-                    _ => Err(format!("range {} must be a number", label)),
+                    _ => Err(format!(
+                        "range {} must be a number, found {}",
+                        label,
+                        symbol.kind()
+                    )),
                 },
                 None => Err(format!("invalid range")),
             }
@@ -168,6 +169,7 @@ impl ASTEvaluator {
                 Some(symbol) => match symbol {
                     Symbol::List(list) => Ok(Box::new(list.items.into_iter())),
                     Symbol::String(ss) => Ok(Box::new(ss.into_iter())),
+                    Symbol::Range(r) => Ok(Box::new(r.into_iter())),
                     _ => Err(format!("{} is not iterable", symbol.kind())),
                 },
                 None => Err("iterator not found".to_string()),
@@ -302,31 +304,29 @@ impl ASTEvaluator {
         &mut self,
         func_name: &str,
         call_expr: CallExpression,
-    ) -> Result<Option<Symbol>, String> {
+    ) -> Result<Symbol, String> {
         let func_statement = match self.get_symbol(func_name)? {
             Symbol::Function(f) => f.clone(),
-            _ => return Ok(None),
+            _ => return Ok(Symbol::None),
         };
-        println!(
-            "visiting {} - {:?} - {:?}",
-            func_name, call_expr, func_statement
-        );
+
         self.validate_function_call(&call_expr, &func_statement)?;
-        println!("after {}", func_name);
 
         self.push_function(call_expr, &func_statement)?;
         let res = self.eval_node(*func_statement.body)?;
-        println!("res: {:?}", res);
         self.symbol_table.pop_scope();
 
-        Ok(res)
+        match res {
+            Some(symbol) => Ok(symbol),
+            None => Ok(Symbol::None),
+        }
     }
 
     fn visit_member_expression_call(
         &mut self,
         member_expr: MemberExpression,
         ast_args: Vec<ASTNode>,
-    ) -> Result<Option<Symbol>, String> {
+    ) -> Result<Symbol, String> {
         let args = self.visit_function_args(ast_args)?;
         let call = member_expr.property.as_str();
 
@@ -338,10 +338,7 @@ impl ASTEvaluator {
         Ok(symbol)
     }
 
-    fn eval_call_expression(
-        &mut self,
-        call_expr: CallExpression,
-    ) -> Result<Option<Symbol>, String> {
+    fn eval_call_expression(&mut self, call_expr: CallExpression) -> Result<Symbol, String> {
         match *call_expr.base {
             ASTNode::Identifier(ref fname) => {
                 self.visit_function(fname.clone().as_str(), call_expr)

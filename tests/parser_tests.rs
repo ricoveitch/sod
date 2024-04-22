@@ -192,7 +192,7 @@ fn ranges() {
         Symbol::Number(3.0),
     );
     assert_expr(
-        "t = 0\nfor v in 1..4..2 {\n t = t + v\n}\nt",
+        "r=1..4..2\nt = 0\nfor v in r {\n t = t + v\n}\nt",
         Symbol::Number(4.0),
     );
     assert_expr(

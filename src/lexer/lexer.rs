@@ -61,8 +61,8 @@ impl Lexer {
         );
 
         // trim trailing dots
-        let (bytes, bytes_read) = {
-            let (mut bytes, _) = read;
+        let (bytes, bytes_read, is_decimal) = {
+            let (mut bytes, original_len) = read;
             for i in (0..bytes.len()).rev() {
                 if bytes[i] == b'.' {
                     bytes.pop();
@@ -71,12 +71,12 @@ impl Lexer {
                 }
             }
             let len = bytes.len();
-            (bytes, len)
+            (bytes, len, seen_dot && len == original_len)
         };
 
         let s = String::from_utf8(bytes)?;
 
-        if seen_dot {
+        if is_decimal {
             let dec = s.parse()?;
             return Ok((TokenType::Decimal(dec), bytes_read));
         }
