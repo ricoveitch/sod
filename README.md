@@ -11,6 +11,7 @@ An alternative to shell script.
 - [Functions](#functions)
 - [For Loops](#for-loops)
 - [Comments](#comments)
+- [Command Line Arguments](#command-line-arguments)
 - [Shell Commands](#shell-commands)
 - [TODO](#todo)
 
@@ -131,6 +132,16 @@ There are only single line comments that start with a `#`.
 ```
 # comment
 echo "hello"
+```
+
+## Command Line Arguments
+
+Command arguments can be accessed via the `argv` list property on the global object `process`.
+
+```
+# sod program-name -f
+process.argv[0] # program-name
+process.argv[1] # -f
 ```
 
 ## Shell Commands
