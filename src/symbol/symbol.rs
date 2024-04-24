@@ -501,7 +501,7 @@ impl std::fmt::Display for Symbol {
             Symbol::Number(n) => n.to_string(),
             Symbol::Boolean(b) => b.to_string(),
             Symbol::Function(f) => format!("func {}", f.name),
-            Symbol::String(s) => s.value.to_string(),
+            Symbol::String(s) => format!("'{}'", s.value),
             Symbol::None => "none".to_string(),
             Symbol::List(list) => {
                 let items: Vec<String> = list.items.iter().map(|f| f.to_string()).collect();
@@ -558,5 +558,12 @@ impl Symbol {
         };
 
         s.to_string()
+    }
+
+    pub fn raw_str(&self) -> String {
+        match self {
+            Symbol::String(ss) => ss.value.clone(),
+            s => s.to_string(),
+        }
     }
 }

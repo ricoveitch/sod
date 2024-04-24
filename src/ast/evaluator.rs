@@ -120,7 +120,7 @@ impl ASTEvaluator {
             let sub_str = match token {
                 ast::TemplateToken::Expression(expr) => {
                     let symbol = self.get_symbol(expr.as_str())?;
-                    symbol.to_string()
+                    symbol.raw_str()
                 }
                 ast::TemplateToken::Literal(s) => s,
             };
@@ -218,9 +218,17 @@ impl ASTEvaluator {
     fn eval_command(&mut self, tokens: Vec<ASTNode>) -> Result<Symbol, String> {
         let mut cmd_string = "".to_owned();
         for node in tokens {
-            if let Some(sym) = self.eval_node(node)? {
-                cmd_string.push_str(sym.to_string().as_str());
-            }
+            let sub_str = match node {
+                ASTNode::TemplateString(ts) => {
+                    let s = self.visit_template_string(ts)?;
+                    format!(r#""{}""#, s.raw_str())
+                }
+                _ => match self.eval_node(node)? {
+                    Some(s) => s.raw_str(),
+                    None => "".to_string(),
+                },
+            };
+            cmd_string.push_str(sub_str.as_str());
         }
 
         let output = commands::run_cmd(&cmd_string);
