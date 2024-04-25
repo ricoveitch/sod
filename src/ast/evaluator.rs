@@ -399,7 +399,10 @@ impl ASTEvaluator {
         };
 
         match symbol {
-            Symbol::Object(obj) => Ok(obj.get(member_expr.property.as_str()).clone()),
+            Symbol::Object(obj) => match obj.get(member_expr.property.as_str()) {
+                Some(s) => Ok(s.clone()),
+                None => Err(format!("object has no property {}", member_expr.property)),
+            },
             _ => Err(format!(
                 "{} has no property {}",
                 symbol.kind(),
@@ -418,7 +421,10 @@ impl ASTEvaluator {
         };
 
         match symbol {
-            Symbol::Object(obj) => Ok(obj.get_mut(member_expr.property.as_str())),
+            Symbol::Object(obj) => match obj.get_mut(member_expr.property.as_str()) {
+                Some(s) => Ok(s),
+                None => Err(format!("object has no property {}", member_expr.property)),
+            },
             _ => Err(format!(
                 "{} has no property {}",
                 symbol.kind(),

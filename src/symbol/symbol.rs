@@ -51,12 +51,12 @@ impl Object {
         Self { mapping }
     }
 
-    pub fn get(&self, key: &str) -> &Symbol {
-        self.mapping.get(key).unwrap_or(&Symbol::None)
+    pub fn get(&self, key: &str) -> Option<&Symbol> {
+        self.mapping.get(key)
     }
 
-    pub fn get_mut(&mut self, key: &str) -> &mut Symbol {
-        self.mapping.get_mut(key).unwrap()
+    pub fn get_mut(&mut self, key: &str) -> Option<&mut Symbol> {
+        self.mapping.get_mut(key)
     }
 }
 
