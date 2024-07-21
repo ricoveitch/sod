@@ -55,7 +55,19 @@ fn functions() {
 
 #[test]
 fn conditionals() {
-    assert_expr("x = 10\nif 2 > 1 {\n x = 20\n}\nx", Symbol::Number(20.0));
+    assert_expr("1 && 2", Symbol::Number(2.0));
+    assert_expr("2 == 2 || 3 == 4", Symbol::Boolean(true));
+    assert_expr("true && (false || true)", Symbol::Boolean(true));
+    assert_expr("(true || false) && (1 && 1)", Symbol::Number(1.0));
+    assert_expr("0 || (1 && 0) || true", Symbol::Boolean(true));
+    assert_expr("0 && (1 && (0 && 1))", Symbol::Number(0.0));
+    assert_expr("0 == 0 && (1 < 0 || 1)", Symbol::Number(1.0));
+    assert_expr(
+        "1 > 1 || 0 > 0 || (1 != 2 && -2 == -2 && 3)",
+        Symbol::Number(3.0),
+    );
+    assert_expr("1 || echo 'foo'", Symbol::Number(1.0));
+    assert_expr("none && 1", Symbol::None);
     assert_expr("x = 10\nif 2 > 1 {\n x = 20\n}\nx", Symbol::Number(20.0));
     assert_expr(
         "foo=1\nx = true\ny = false\nif x || y {\n foo = 2\n}\nfoo",
@@ -99,8 +111,6 @@ fn conditionals() {
         x",
         Symbol::Number(2.0),
     );
-    assert_expr("1 || echo 'foo'", Symbol::Number(1.0));
-    assert_expr("none && 1", Symbol::None);
 }
 
 #[test]
