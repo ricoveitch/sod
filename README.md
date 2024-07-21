@@ -1,6 +1,6 @@
 # Sod
 
-An alternative to shell script.
+A toy alternative to shell script.
 
 ## Table of contents
 
@@ -104,7 +104,11 @@ if x {
 
 ## Functions
 
+Functions must be declared before they are used.
+
 ```
+# add(2,3) would fail
+
 func add(x, y) {
     return x + y
 }
